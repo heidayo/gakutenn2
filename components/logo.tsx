@@ -45,49 +45,41 @@ export function Logo({ variant = "full", size = "md", className = "" }: LogoProp
 
   if (variant === "horizontal") {
     return (
-      <div className={`flex items-center w-full h-full ${className}`}>
-        <Image
-          src="/images/gakuten-full-logo.png"
-          alt="GAKUTEN インターン"
-          width={200}
-          height={60}
-          className="w-full h-full object-contain"
-          style={{
-            width: "100%",
-            height: "100%",
-            maxHeight: size === "sm" ? "24px" : size === "md" ? "32px" : size === "lg" ? "48px" : "64px",
-          }}
-        />
+      <div className={`flex items-center space-x-3 ${className}`}>
+        <LogoIcon size={size} />
+        <span
+          className={`font-bold bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent ${textSizeClasses[size]}`}
+        >
+          学転インターン
+        </span>
       </div>
     )
   }
 
   if (variant === "vertical") {
     return (
-      <div className={`flex items-center ${className}`}>
-        <Image
-          src="/images/gakuten-full-logo.png"
-          alt="GAKUTEN インターン"
-          width={200}
-          height={60}
-          className="h-8 w-auto object-contain"
-          style={{ height: size === "sm" ? "24px" : size === "md" ? "32px" : size === "lg" ? "48px" : "64px" }}
-        />
+      <div className={`flex flex-col items-center space-y-2 ${className}`}>
+        <LogoIcon size={size} />
+        <span
+          className={`font-bold bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent ${textSizeClasses[size]} text-center`}
+        >
+          学転
+          <br />
+          インターン
+        </span>
       </div>
     )
   }
 
-  // デフォルト（full）も同様に変更
+  // デフォルト（full）
   return (
-    <div className={`flex items-center ${className}`}>
-      <Image
-        src="/images/gakuten-full-logo.png"
-        alt="GAKUTEN インターン"
-        width={200}
-        height={60}
-        className="h-8 w-auto object-contain"
-        style={{ height: size === "sm" ? "24px" : size === "md" ? "32px" : size === "lg" ? "48px" : "64px" }}
-      />
+    <div className={`flex items-center space-x-2 ${className}`}>
+      <LogoIcon size={size} />
+      <span
+        className={`font-bold bg-gradient-to-r from-orange-500 to-orange-700 bg-clip-text text-transparent ${textSizeClasses[size]}`}
+      >
+        学転インターン
+      </span>
     </div>
   )
 }
