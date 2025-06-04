@@ -1,0 +1,316 @@
+"use client"
+
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Textarea } from "@/components/ui/textarea"
+import { Label } from "@/components/ui/label"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
+import {
+  ArrowLeft,
+  Star,
+  Building2,
+  Calendar,
+  Clock,
+  BookOpen,
+  FileText,
+  Save,
+  Share,
+  Copy,
+  CheckCircle,
+  Target,
+  TrendingUp,
+  Award,
+} from "lucide-react"
+import Link from "next/link"
+import { useState } from "react"
+
+export default function FeedbackDetailPage({ params }: { params: { id: string } }) {
+  const [learningNote, setLearningNote] = useState("")
+  const [showResumeDialog, setShowResumeDialog] = useState(false)
+  const [isSaved, setIsSaved] = useState(false)
+
+  const feedback = {
+    id: 1,
+    company: "株式会社テックスタート",
+    role: "Webマーケティングアシスタント",
+    rating: 4.5,
+    date: "2024年5月28日",
+    duration: "2週間",
+    category: "マーケティング",
+    interviewer: "田中 マネージャー",
+    isNew: true,
+    companyComment:
+      "田中さんは非常に積極的に業務に取り組んでいただきました。特にデータ分析の分野で顕著な成長が見られ、Excel の高度な機能を短期間で習得されました。また、チームメンバーとのコミュニケーションも円滑で、質問も的確でした。今後はプレゼンテーション力を向上させることで、さらに活躍の幅が広がると思います。マーケティング分野での継続的な学習をお勧めします。",
+    strengths: ["データ分析スキル", "積極性", "コミュニケーション力", "学習意欲"],
+    improvements: ["プレゼンテーション力", "戦略的思考", "リーダーシップ"],
+    skills: [
+      { name: "Excel", before: 2, after: 4 },
+      { name: "データ分析", before: 1, after: 3 },
+      { name: "マーケティング基礎", before: 2, after: 3 },
+    ],
+    existingLearningNote:
+      "データ分析の重要性を実感しました。特にExcelのピボットテーブルやVLOOKUP関数を実際の業務で使えるようになったのは大きな成果です。",
+  }
+
+  const handleSaveLearningNote = () => {
+    // 学びメモ保存処理
+    console.log("Saving learning note:", learningNote)
+    setIsSaved(true)
+    setTimeout(() => setIsSaved(false), 2000)
+  }
+
+  const handleAddToResume = () => {
+    // 履歴書転記処理
+    console.log("Adding to resume")
+    setShowResumeDialog(false)
+  }
+
+  const renderStars = (rating: number) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <Star key={i} className={`h-5 w-5 ${i < rating ? "text-yellow-500 fill-current" : "text-gray-300"}`} />
+    ))
+  }
+
+  const renderSkillProgress = (skill: { name: string; before: number; after: number }) => {
+    return (
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-sm">
+          <span>{skill.name}</span>
+          <span className="text-gray-600">
+            {skill.before} → {skill.after}
+          </span>
+        </div>
+        <div className="flex space-x-2">
+          <div className="flex-1 bg-gray-200 rounded-full h-2">
+            <div className="bg-gray-400 h-2 rounded-full" style={{ width: `${(skill.before / 5) * 100}%` }}></div>
+          </div>
+          <span className="text-xs text-gray-500">→</span>
+          <div className="flex-1 bg-gray-200 rounded-full h-2">
+            <div className="bg-blue-600 h-2 rounded-full" style={{ width: `${(skill.after / 5) * 100}%` }}></div>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-50 pb-6">
+      {/* Header */}
+      <header className="bg-white border-b sticky top-0 z-40 px-4 py-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <Link href="/student/feedback">
+              <ArrowLeft className="h-6 w-6 text-gray-600" />
+            </Link>
+            <span className="text-lg font-semibold">フィードバック詳細</span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button variant="ghost" size="sm">
+              <Share className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="sm">
+              <Copy className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div className="px-4 py-6 space-y-6">
+        {/* Header Info */}
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between mb-4">
+              <div className="flex-1">
+                <div className="flex items-center space-x-2 mb-2">
+                  <Building2 className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-600">{feedback.company}</span>
+                  {feedback.isNew && <Badge className="bg-red-500 text-white text-xs px-1.5 py-0.5">NEW</Badge>}
+                </div>
+                <h1 className="text-xl font-bold mb-2">{feedback.role}</h1>
+                <div className="flex items-center space-x-4 text-sm text-gray-600">
+                  <div className="flex items-center space-x-1">
+                    <Calendar className="h-4 w-4" />
+                    <span>{feedback.date}</span>
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <Clock className="h-4 w-4" />
+                    <span>{feedback.duration}</span>
+                  </div>
+                </div>
+              </div>
+              <div className="text-center">
+                <div className="flex items-center space-x-1 mb-1">{renderStars(feedback.rating)}</div>
+                <div className="text-2xl font-bold text-yellow-600">{feedback.rating}</div>
+              </div>
+            </div>
+            <div className="flex items-center space-x-4">
+              <Badge variant="outline">{feedback.category}</Badge>
+              <span className="text-sm text-gray-600">評価者: {feedback.interviewer}</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Company Feedback */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center">
+              <Award className="h-4 w-4 mr-2" />
+              企業からのフィードバック
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="bg-blue-50 p-4 rounded-lg">
+              <p className="text-sm leading-relaxed">{feedback.companyComment}</p>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Strengths & Improvements */}
+        <div className="grid grid-cols-1 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center text-green-600">
+                <CheckCircle className="h-4 w-4 mr-2" />
+                評価された強み
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {feedback.strengths.map((strength, index) => (
+                  <Badge key={index} className="bg-green-100 text-green-800">
+                    {strength}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center text-orange-600">
+                <Target className="h-4 w-4 mr-2" />
+                改善ポイント
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {feedback.improvements.map((improvement, index) => (
+                  <Badge key={index} variant="outline" className="border-orange-200 text-orange-700">
+                    {improvement}
+                  </Badge>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Skill Growth */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center">
+              <TrendingUp className="h-4 w-4 mr-2" />
+              スキル成長
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {feedback.skills.map((skill, index) => (
+              <div key={index}>{renderSkillProgress(skill)}</div>
+            ))}
+          </CardContent>
+        </Card>
+
+        {/* Learning Note */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base flex items-center">
+              <BookOpen className="h-4 w-4 mr-2" />
+              学びメモ
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {feedback.existingLearningNote && (
+              <div className="bg-gray-50 p-3 rounded-lg">
+                <p className="text-sm text-gray-700">{feedback.existingLearningNote}</p>
+              </div>
+            )}
+            <div className="space-y-2">
+              <Label>追加の学びや気づき</Label>
+              <Textarea
+                value={learningNote}
+                onChange={(e) => setLearningNote(e.target.value)}
+                placeholder="この経験から学んだことや今後活かしたいポイントを記入してください..."
+                className="min-h-[100px]"
+              />
+            </div>
+            <div className="flex space-x-2">
+              <Button onClick={handleSaveLearningNote} className="flex-1" disabled={!learningNote.trim()}>
+                {isSaved ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    保存済み
+                  </>
+                ) : (
+                  <>
+                    <Save className="h-4 w-4 mr-2" />
+                    学びメモを保存
+                  </>
+                )}
+              </Button>
+              <Dialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="flex-1">
+                    <FileText className="h-4 w-4 mr-2" />
+                    履歴書に転記
+                  </Button>
+                </DialogTrigger>
+              </Dialog>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Resume Transfer Dialog */}
+      <Dialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
+        <DialogContent className="max-w-sm mx-auto">
+          <DialogHeader>
+            <DialogTitle>履歴書への転記</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-gray-600">
+              このフィードバックと学びメモを履歴書の「実務経験」セクションに追加しますか？
+            </p>
+            <div className="bg-gray-50 p-3 rounded-lg">
+              <h4 className="font-semibold text-sm mb-2">転記内容プレビュー</h4>
+              <div className="text-xs space-y-1">
+                <p>
+                  <strong>職種:</strong> {feedback.role}
+                </p>
+                <p>
+                  <strong>企業:</strong> {feedback.company}
+                </p>
+                <p>
+                  <strong>期間:</strong> {feedback.duration}
+                </p>
+                <p>
+                  <strong>評価:</strong> ★{feedback.rating}
+                </p>
+                <p>
+                  <strong>学び:</strong> {feedback.existingLearningNote || learningNote}
+                </p>
+              </div>
+            </div>
+            <div className="flex space-x-2">
+              <Button variant="outline" onClick={() => setShowResumeDialog(false)} className="flex-1">
+                キャンセル
+              </Button>
+              <Button onClick={handleAddToResume} className="flex-1 bg-blue-600 hover:bg-blue-700">
+                履歴書に追加
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
