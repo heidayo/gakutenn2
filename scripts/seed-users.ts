@@ -1,5 +1,5 @@
 import 'dotenv/config'
-import { supabaseAdmin } from '../lib/supabase/admin.js'
+import { supabaseAdmin } from '../lib/supabase/admin.ts'
 
 const users = [
   { email: 'tanaka@example.com',  password: 'password123', role: 'student' },
@@ -11,7 +11,7 @@ for (const u of users) {
   const { error } = await supabaseAdmin.auth.admin.createUser({
     email: u.email,
     password: u.password,
-    email_confirm: true,       // ← メール確認済み状態で作成
+    email_confirm: true,
     user_metadata: { role: u.role },
   })
   console.log(error ? `✗ ${u.email} ${error.message}` : `✓ ${u.email}`)

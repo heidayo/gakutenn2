@@ -9,6 +9,14 @@ if (error) {
 }
 
 console.log(`✓ ${data.users.length} users`)
+// 詳細表示: created_at | email | role | provider | email_confirmed
 for (const u of data.users) {
-  console.log(`${u.id}  ${u.email}  ${u.user_metadata?.role ?? ''}`)
+  const role       = u.user_metadata?.role ?? '—'
+  const provider   = u.identities?.[0]?.provider ?? '—'
+  const confirmed  = u.email_confirmed_at ? '✓' : '✗'
+  const created_at = new Date(u.created_at).toLocaleString()
+
+  console.log(
+    `${created_at} | ${u.email} | role:${role} | provider:${provider} | confirmed:${confirmed}`
+  )
 }
