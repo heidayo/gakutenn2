@@ -1,7 +1,44 @@
-import { createClient, SupabaseClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import type { Database } from "@/lib/supabase/types.ts";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+/* ------------------------------------------------------------
+ * Supabase singleton client
+ * ------------------------------------------------------------
+ * - Reads NEXT_PUBLIC_SUPABASE_URL / KEY at build‑time.
+ * - Throws immediately if env vars are missing (easier debug).
+ * - In development, exposes `window.supabase` for quick console tests.
+ * ------------------------------------------------------------ */
 
-// ブラウザ / SSR 用クライアント（Anon キー）
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseKey)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error(
+    [
+      "❌ Supabase env vars are missing.",
+      `NEXT_PUBLIC_SUPABASE_URL = ${supabaseUrl}`,
+      `NEXT_PUBLIC_SUPABASE_ANON_KEY = ${
+        supabaseKey ? supabaseKey.slice(0, 10) + "…" : supabaseKey
+      }`,
+      "Check your .env.local (development) or Vercel env vars (production).",
+    ].join("\n")
+  );
+}
+
+/** Browser / SSR client (Anon key) */
+export const supabase: SupabaseClient<Database> = createClient<Database>(
+  supabaseUrl,
+  supabaseKey
+);
+
+// ──────────────── dev helper ─────────────────
+if (
+  process.env.NODE_ENV === "development" &&
+  typeof window !== "undefined"
+) {
+  // @ts-ignore
+  window.supabase = supabase;
+  // Helpful one‑shot log
+  // eslint-disable-next-line no-console
+  console.log("[Supabase] client attached to window.supabase");
+}
