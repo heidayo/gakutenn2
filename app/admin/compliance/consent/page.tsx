@@ -118,7 +118,7 @@ export default function ConsentManagementPage() {
     try {
       await new Promise((resolve) => setTimeout(resolve, 500))
 
-      setConsentCategories((prev) =>
+      setConsentCategories((prfev) =>
         prev.map((category) => {
           if (category.id === categoryId) {
             const newConsentRate = enabled
