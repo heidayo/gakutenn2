@@ -1,4 +1,6 @@
 // app/student/mypage/page.tsx
+export const dynamic = 'force-dynamic'; 
+
 import { supabaseServer } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 

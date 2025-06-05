@@ -2,9 +2,14 @@
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 
-/** 非同期版 Supabase クライアント */
-export const supabaseServer = async () => {
-  // ← ここを await にする
+/**
+ * サーバーサイドで安全に呼び出す Supabase クライアント
+ *
+ * Next.js 15 では `cookies()` が Promise を返すため、ここも `async` でラップ。
+ * 利用側は `await createSupabaseServerClient()` で呼び出してください。
+ */
+export async function createSupabaseServerClient() {
+  // `cookies()` は Promise<ReadonlyRequestCookies>
   const cookieStore = await cookies();
 
   return createServerClient(
@@ -15,13 +20,17 @@ export const supabaseServer = async () => {
         get(name: string) {
           return cookieStore.get(name)?.value;
         },
+        /**
+         * NOTE: `ReadonlyRequestCookies` には型定義が無いので
+         *       ダウンキャストして実行時のメソッドを呼び出す
+         */
         set(name: string, value: string, options?: CookieOptions) {
-          cookieStore.set({ name, value, ...options });
+          (cookieStore as any).set({ name, value, ...options });
         },
         remove(name: string, options?: CookieOptions) {
-          cookieStore.delete({ name, ...options });
+          (cookieStore as any).delete({ name, ...options });
         },
       },
     }
   );
-};
+}
