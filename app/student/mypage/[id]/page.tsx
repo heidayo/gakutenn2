@@ -1,4 +1,6 @@
 // app/student/mypage/[id]/page.tsx
+export const dynamic = 'force-dynamic';
+
 import { supabaseServer } from '@/lib/supabase/server';
 import { notFound } from 'next/navigation';
 
@@ -7,7 +9,7 @@ export default async function StudentMyPage({
 }: {
   params: { id: string };
 }) {
-  const supabase = supabaseServer();
+  const supabase = await supabaseServer();
   const {
     data: { user },
   } = await supabase.auth.getUser();

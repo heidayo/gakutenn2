@@ -55,7 +55,8 @@ export default function StudentLoginPage() {
     setSocialLoading(provider)
 
     const { error } = await supabase.auth.signInWithOAuth({
-      provider,
+      // `line` は型定義に無いのでキャストして渡す
+      provider: provider as any,
       options: { redirectTo: `${location.origin}/student/mypage` },
     })
 
@@ -124,6 +125,7 @@ export default function StudentLoginPage() {
               <Input
                 id="email"
                 type="email"
+                autoComplete="email"
                 placeholder="student@university.ac.jp"
                 required
                 value={email}
@@ -137,6 +139,7 @@ export default function StudentLoginPage() {
                 <Input
                   id="password"
                   type={showPassword ? "text" : "password"}
+                  autoComplete="current-password"
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
