@@ -1,11 +1,11 @@
 // app/student/mypage/page.tsx
 export const dynamic = 'force-dynamic'; 
 
-import { supabaseServer } from "@/lib/supabase/server";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 export default async function MyPageRoot() {
-  const supabase = supabaseServer();
+  const supabase = await createSupabaseServerClient();
   const {
     data: { user },
   } = await supabase.auth.getUser();
