@@ -2,6 +2,8 @@
 
 import { useState } from "react"
 import Link from "next/link"
+import { supabase } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -32,6 +34,7 @@ export default function StudentRegisterPage() {
   })
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
   const validateStep1 = () => {
     const newErrors: Record<string, string> = {}
@@ -96,15 +99,39 @@ export default function StudentRegisterPage() {
   }
 
   const handleSubmit = async () => {
+    if (isLoading) return
     setIsLoading(true)
+    setErrors({}) // 送信前にエラーをリセット
+
     try {
-      // 登録API呼び出し
-      await new Promise((resolve) => setTimeout(resolve, 2000)) // シミュレーション
+      const { email, password } = formData
+
+      // Supabase でユーザー登録
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            university: formData.university,
+            grade: formData.grade,
+            major: formData.major,
+            phone: formData.phone,
+          },
+          emailRedirectTo: `${location.origin}/auth/callback`,
+        },
+      })
+
+      if (error) {
+        setErrors({ submit: error.message })
+        return
+      }
 
       // 登録完了ページへリダイレクト
-      window.location.href = "/auth/student/register/complete"
-    } catch (error) {
-      setErrors({ submit: "登録に失敗しました。もう一度お試しください。" })
+      router.push("/auth/student/register/complete")
+    } catch (err: any) {
+      setErrors({ submit: err.message ?? "登録に失敗しました。もう一度お試しください。" })
     } finally {
       setIsLoading(false)
     }

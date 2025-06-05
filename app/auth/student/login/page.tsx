@@ -11,9 +11,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase/client"
 
 export default function StudentLoginPage() {
   const { toast } = useToast()
+  const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -24,58 +27,44 @@ export default function StudentLoginPage() {
     e.preventDefault()
     setIsLoading(true)
 
-    try {
-      // 仮のログインロジック
-      await new Promise((resolve, reject) =>
-        setTimeout(() => {
-          if (email !== "student@example.com" || password !== "password123") {
-            reject(new Error("メールアドレスまたはパスワードが正しくありません。"))
-          } else {
-            resolve(true)
-          }
-        }, 1500),
-      )
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    })
 
-      toast({
-        title: "ログイン成功！",
-        description: "学生ダッシュボードへ移動します。",
-        variant: "default",
-      })
-
-      // 学生ダッシュボードへリダイレクト
-      window.location.href = "/student/dashboard"
-    } catch (err: any) {
+    if (error) {
       toast({
         title: "ログインに失敗しました",
-        description: err.message || "エラーが発生しました。もう一度お試しください。",
+        description: error.message,
         variant: "destructive",
       })
-    } finally {
       setIsLoading(false)
+      return
     }
+
+    toast({
+      title: "ログイン成功！",
+      description: "学生ダッシュボードへ移動します。",
+      variant: "default",
+    })
+    router.push("/student/mypage")
+    setIsLoading(false)
   }
 
-  const handleSocialLogin = async (provider: string) => {
+  const handleSocialLogin = async (provider: "google" | "line") => {
     setSocialLoading(provider)
 
-    try {
-      // 仮のソーシャルログインロジック
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider,
+      options: { redirectTo: `${location.origin}/student/mypage` },
+    })
 
-      toast({
-        title: `${provider}ログイン成功！`,
-        description: "学生ダッシュボードへ移動します。",
-        variant: "default",
-      })
-
-      window.location.href = "/student/dashboard"
-    } catch (err) {
+    if (error) {
       toast({
         title: `${provider}ログインに失敗しました`,
-        description: "エラーが発生しました。もう一度お試しください。",
+        description: error.message,
         variant: "destructive",
       })
-    } finally {
       setSocialLoading(null)
     }
   }
@@ -93,10 +82,10 @@ export default function StudentLoginPage() {
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => handleSocialLogin("LINE")}
+              onClick={() => handleSocialLogin("line")}
               disabled={socialLoading !== null}
             >
-              {socialLoading === "LINE" ? (
+              {socialLoading === "line" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Smartphone className="mr-2 h-4 w-4 text-green-600" />
@@ -107,10 +96,10 @@ export default function StudentLoginPage() {
             <Button
               variant="outline"
               className="w-full"
-              onClick={() => handleSocialLogin("Google")}
+              onClick={() => handleSocialLogin("google")}
               disabled={socialLoading !== null}
             >
-              {socialLoading === "Google" ? (
+              {socialLoading === "google" ? (
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
               ) : (
                 <Mail className="mr-2 h-4 w-4 text-red-600" />

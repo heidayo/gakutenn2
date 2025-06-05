@@ -1,3 +1,4 @@
+'use client'
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -22,8 +23,52 @@ import {
   Brain,
 } from "lucide-react"
 import Link from "next/link"
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 export default function StudentProfilePage() {
+  const supabase = createClientComponentClient();
+  const router = useRouter();
+
+  const [authUser, setAuthUser] = useState<any | null>(null);
+  const [profile, setProfile] = useState<any | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const load = async () => {
+      // 1) 認証ユーザーを取得
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        router.push("/login");        // ログインしていなければログイン画面へ
+        return;
+      }
+      setAuthUser(user);
+
+      // 2) プロフィールを取得
+      const { data, error } = await supabase
+        .from("profiles")            // ← プロフィールテーブル名
+        .select("*")
+        .eq("auth_user_id", user.id) // ← 認証ユーザーと紐づく列
+        .single();
+
+      if (!error) {
+        setProfile(data);
+      }
+      setLoading(false);
+    };
+
+    load();
+  }, [supabase, router]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        読み込み中...
+      </div>
+    );
+  }
+
   const skills = [
     { name: "Webマーケティング", level: 3 },
     { name: "データ分析", level: 2 },
@@ -87,14 +132,14 @@ export default function StudentProfilePage() {
                 </Button>
               </div>
               <div className="flex-1">
-                <h2 className="text-xl font-bold">田中 太郎</h2>
+                <h2 className="text-xl font-bold">{profile?.full_name ?? "氏名未登録"}</h2>
                 <div className="flex items-center space-x-1 text-gray-600 text-sm mt-1">
                   <GraduationCap className="h-4 w-4" />
-                  <span>東京大学 経済学部 2年生</span>
+                  <span>{profile?.university ?? "大学名未登録"}</span>
                 </div>
                 <div className="flex items-center space-x-1 text-gray-600 text-sm mt-1">
                   <MapPin className="h-4 w-4" />
-                  <span>東京都</span>
+                  <span>{profile?.prefecture ?? "所在地未登録"}</span>
                 </div>
               </div>
             </div>
@@ -117,7 +162,7 @@ export default function StudentProfilePage() {
           <CardContent className="space-y-3">
             <div className="flex items-center space-x-3">
               <Mail className="h-4 w-4 text-gray-500" />
-              <span className="text-sm">tanaka.taro@example.com</span>
+              <span className="text-sm">{authUser?.email ?? "メール未登録"}</span>
             </div>
             <div className="flex items-center space-x-3">
               <Phone className="h-4 w-4 text-gray-500" />
