@@ -40,7 +40,7 @@ export default function StudentProfilePage() {
       // 1) 認証ユーザーを取得
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        router.push("/login");        // ログインしていなければログイン画面へ
+        router.push("/student/mypage"); // ログインしていなければログイン画面へ
         return;
       }
       setAuthUser(user);

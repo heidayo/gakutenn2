@@ -27,7 +27,7 @@ export default function StudentLoginPage() {
     e.preventDefault()
     setIsLoading(true)
 
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     })
@@ -44,10 +44,10 @@ export default function StudentLoginPage() {
 
     toast({
       title: "ログイン成功！",
-      description: "学生ダッシュボードへ移動します。",
+      description: "マイページへ移動します。",
       variant: "default",
     })
-    router.push("/student/mypage")
+    router.push(`/student/mypage/${data.session!.user.id}`)
     setIsLoading(false)
   }
 
