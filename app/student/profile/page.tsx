@@ -1,7 +1,6 @@
 // app/student/profile/page.tsx
 import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
-import type { Database } from "@/lib/supabase/types";
 import {
   ArrowLeft,
   Edit,
@@ -27,13 +26,23 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 
+/**
+ * Narrowed row type for the columns this page actually needs from `profiles`.
+ * This keeps TypeScript happy even when the generated Supabase types are stale.
+ */
+type ProfileRow = {
+  full_name: string | null;
+  university: string | null;
+  prefecture: string | null;
+};
+
 /* ─────────────────────────────────────────────────────────────
  * Server Component
  *  - 認証ユーザーとプロフィールを取得して
  *    Client Component に渡す
  * ──────────────────────────────────────────────────────────── */
 export default async function StudentProfilePage() {
-  const supabase = createSupabaseServerClient<Database>();
+  const supabase = await createSupabaseServerClient();
 
   // 認証チェック
   const {
@@ -44,9 +53,10 @@ export default async function StudentProfilePage() {
   // プロフィール取得
   const { data: profile } = await supabase
     .from("profiles")
+    // 型チェックを緩めるために * で取得し、必要なカラムを ProfileRow として絞る
     .select("*")
     .eq("auth_user_id", user.id)
-    .single();
+    .single<ProfileRow>();
 
   return <StudentProfileClient profile={profile} email={user.email ?? ""} />;
 }
@@ -59,7 +69,7 @@ export default async function StudentProfilePage() {
 import { FC } from "react";
 
 type Props = {
-  profile: Database["public"]["Tables"]["profiles"]["Row"] | null;
+  profile: ProfileRow | null;
   email: string;
 };
 
@@ -333,3 +343,16 @@ const StudentProfileClient: FC<Props> = ({ profile, email }) => {
             >
               <div className="flex items-center space-x-3">
                 <Star className="h-5 w-5 text-yellow-600" />
+                <div>
+                  <div className="font-semibold text-sm">企業からの評価</div>
+                  <div className="text-xs text-gray-600">フィードバックを確認</div>
+                </div>
+              </div>
+              <ChevronRight className="h-4 w-4 text-gray-400" />
+            </Link>
+          </Card>
+        </div> {/* end of Quick Actions */}
+      </div> {/* end of inner padding container */}
+  　</div> {/* end of page wrapper */}
+  );
+};
