@@ -1,3 +1,5 @@
+'use server';
+
 // lib/supabase/server.ts
 
 import { createServerClient, type CookieOptions } from "@supabase/ssr";

@@ -1,6 +1,7 @@
+'use client'
 import { createBrowserClient } from "@supabase/ssr";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Database } from "@/lib/supabase/types.ts";
+import type { Database } from "@/lib/supabase/types";
 
 /* ------------------------------------------------------------
  * Supabase singleton client
