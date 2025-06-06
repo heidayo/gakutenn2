@@ -25,10 +25,11 @@ import {
 import Link from "next/link"
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import type { Database } from "@/lib/supabase/types";
 
 export default function StudentProfilePage() {
-  const supabase = createClientComponentClient();
+  const supabase = createClientComponentClient<Database>();
   const router = useRouter();
 
   const [authUser, setAuthUser] = useState<any | null>(null);

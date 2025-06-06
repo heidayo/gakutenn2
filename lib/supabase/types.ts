@@ -1,12 +1,4 @@
-[?25l
-    Select a project:                                                                                                     
-                                                                                                                          
-  >  1. jinvtjqxiogbelkdyjcg [name: heidayo's Project, org: pkmsxprrliokupykonru, region: ap-northeast-1]                 
-    2. fxrctrlqdxlboefimrdx [name: supabase-gakutennin, org: vercel_icfg_hGfTq90gC14kDp1fPpBhHXOK, region: ap-northeast-1]
-                                                                                                                          
-                                                                                                                          
-    ↑/k up • ↓/j down • / filter • q quit • ? more                                                                        
-                                                                                                                          [0D[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[2K[1A[0D[2K [0D[2K[?25h[?1002l[?1003l[?1006lexport type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -17,30 +9,305 @@
 export type Database = {
   public: {
     Tables: {
-      reservations: {
+      companies: {
         Row: {
+          address: string | null
           created_at: string | null
-          datetime: string
-          email: string | null
+          description: string | null
+          email: string
           id: string
+          industry: string | null
+          logo_url: string | null
           name: string
-          people: number
+          phone: string | null
+          size: string | null
+          updated_at: string | null
+          website: string | null
         }
         Insert: {
+          address?: string | null
           created_at?: string | null
-          datetime: string
-          email?: string | null
+          description?: string | null
+          email: string
           id?: string
+          industry?: string | null
+          logo_url?: string | null
           name: string
-          people: number
+          phone?: string | null
+          size?: string | null
+          updated_at?: string | null
+          website?: string | null
         }
         Update: {
+          address?: string | null
           created_at?: string | null
-          datetime?: string
-          email?: string | null
+          description?: string | null
+          email?: string
           id?: string
+          industry?: string | null
+          logo_url?: string | null
           name?: string
-          people?: number
+          phone?: string | null
+          size?: string | null
+          updated_at?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      feedback_templates: {
+        Row: {
+          category: string
+          company_id: string
+          created_at: string | null
+          created_by: string | null
+          default_comments: Json | null
+          description: string | null
+          evaluation_criteria: Json
+          id: string
+          is_active: boolean | null
+          name: string
+          updated_at: string | null
+          usage_count: number | null
+        }
+        Insert: {
+          category: string
+          company_id: string
+          created_at?: string | null
+          created_by?: string | null
+          default_comments?: Json | null
+          description?: string | null
+          evaluation_criteria: Json
+          id?: string
+          is_active?: boolean | null
+          name: string
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Update: {
+          category?: string
+          company_id?: string
+          created_at?: string | null
+          created_by?: string | null
+          default_comments?: Json | null
+          description?: string | null
+          evaluation_criteria?: Json
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          updated_at?: string | null
+          usage_count?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedback_templates_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      feedbacks: {
+        Row: {
+          assignee: string
+          attachments: Json | null
+          content: string
+          created_at: string | null
+          id: string
+          improvements: Json | null
+          internal_memo: string | null
+          internship_id: string
+          overall_comment: string | null
+          rating: number
+          scheduled_at: string | null
+          sent_at: string | null
+          status: string | null
+          strengths: Json | null
+          template_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assignee: string
+          attachments?: Json | null
+          content: string
+          created_at?: string | null
+          id?: string
+          improvements?: Json | null
+          internal_memo?: string | null
+          internship_id: string
+          overall_comment?: string | null
+          rating: number
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          strengths?: Json | null
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assignee?: string
+          attachments?: Json | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          improvements?: Json | null
+          internal_memo?: string | null
+          internship_id?: string
+          overall_comment?: string | null
+          rating?: number
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          strengths?: Json | null
+          template_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "feedbacks_internship_id_fkey"
+            columns: ["internship_id"]
+            isOneToOne: false
+            referencedRelation: "internships"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedbacks_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "feedback_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      internships: {
+        Row: {
+          company_id: string
+          created_at: string | null
+          department: string
+          end_date: string
+          id: string
+          job_name: string
+          job_title: string
+          mentor_name: string | null
+          start_date: string
+          status: string | null
+          student_id: string
+          total_hours: number | null
+          updated_at: string | null
+          work_days: number | null
+        }
+        Insert: {
+          company_id: string
+          created_at?: string | null
+          department: string
+          end_date: string
+          id?: string
+          job_name: string
+          job_title: string
+          mentor_name?: string | null
+          start_date: string
+          status?: string | null
+          student_id: string
+          total_hours?: number | null
+          updated_at?: string | null
+          work_days?: number | null
+        }
+        Update: {
+          company_id?: string
+          created_at?: string | null
+          department?: string
+          end_date?: string
+          id?: string
+          job_name?: string
+          job_title?: string
+          mentor_name?: string | null
+          start_date?: string
+          status?: string | null
+          student_id?: string
+          total_hours?: number | null
+          updated_at?: string | null
+          work_days?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "internships_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "internships_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          full_name: string | null
+          user_id: string
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          user_id: string
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          full_name?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      students: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          email: string
+          id: string
+          location: string | null
+          major: string
+          name: string
+          phone: string | null
+          status: string | null
+          university: string
+          updated_at: string | null
+          year: number
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email: string
+          id?: string
+          location?: string | null
+          major: string
+          name: string
+          phone?: string | null
+          status?: string | null
+          university: string
+          updated_at?: string | null
+          year: number
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          email?: string
+          id?: string
+          location?: string | null
+          major?: string
+          name?: string
+          phone?: string | null
+          status?: string | null
+          university?: string
+          updated_at?: string | null
+          year?: number
         }
         Relationships: []
       }

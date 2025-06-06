@@ -1,4 +1,5 @@
-import { createClient, SupabaseClient } from "@supabase/supabase-js";
+import { createBrowserClient } from "@supabase/ssr";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/lib/supabase/types.ts";
 
 /* ------------------------------------------------------------
@@ -26,7 +27,7 @@ if (!supabaseUrl || !supabaseKey) {
 }
 
 /** Browser / SSR client (Anon key) */
-export const supabase: SupabaseClient<Database> = createClient<Database>(
+export const supabase: SupabaseClient<Database> = createBrowserClient<Database>(
   supabaseUrl,
   supabaseKey
 );
