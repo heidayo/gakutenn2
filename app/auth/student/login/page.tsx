@@ -47,7 +47,7 @@ export default function StudentLoginPage() {
       description: "マイページへ移動します。",
       variant: "default",
     })
-    router.push(`/student/mypage/${data.session!.user.id}`)
+    router.push(`/student`)
     setIsLoading(false)
   }
 
