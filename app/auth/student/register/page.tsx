@@ -106,8 +106,8 @@ export default function StudentRegisterPage() {
     try {
       const { email, password } = formData
 
-      // Supabase でユーザー登録
-      const { error } = await supabase.auth.signUp({
+      // 1) Supabase でユーザー登録
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -128,7 +128,31 @@ export default function StudentRegisterPage() {
         return
       }
 
-      // 登録完了ページへリダイレクト
+      // 2) プロフィールテーブルに基本情報を保存 / 更新
+      if (data?.user) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .upsert(
+            {
+              user_id: data.user.id,                       // RLS で本人のみ更新可
+              email: formData.email,
+              first_name: formData.firstName,
+              last_name: formData.lastName,
+              full_name: `${formData.lastName} ${formData.firstName}`,
+              university: formData.university,
+              faculty: formData.major,                     // 専攻を faculty に一旦格納
+              phone: formData.phone,
+            },
+            { onConflict: "user_id" }                     // 既存レコードがあれば更新
+          )
+
+        if (profileError) {
+          setErrors({ submit: profileError.message })
+          return
+        }
+      }
+
+      // 3) 完了ページへリダイレクト
       router.push("/auth/student/register/complete")
     } catch (err: any) {
       setErrors({ submit: err.message ?? "登録に失敗しました。もう一度お試しください。" })

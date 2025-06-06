@@ -1,6 +1,8 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { type Database } from "@/lib/supabase/types" 
+import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,37 +10,133 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { ArrowLeft, Camera, Save } from "lucide-react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 
+// Row 型（読み取り用）
+type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
+
 export default function AccountEditPage() {
+  const router = useRouter()
+  type ProfileInsert =
+   Database["public"]["Tables"]["profiles"]["Insert"]
+
   const [formData, setFormData] = useState({
-    firstName: "田中",
-    lastName: "太郎",
-    email: "tanaka.taro@example.com",
-    phone: "090-1234-5678",
-    university: "東京大学",
-    faculty: "経済学部",
-    year: "2",
-    location: "東京都",
-    bio: "経済学を専攻する大学2年生です。データ分析とマーケティングに興味があり、実務経験を積みながらスキルを向上させたいと考えています。",
+    firstName: "",
+    lastName: "",
+    email: "",
+    phone: "",
+    university: "",
+    faculty: "",
+    year: "",
+    location: "",
+    bio: "",
+    
   })
 
-  const handleChange = (e) => {
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select(
+          "first_name, last_name, email, phone, university, faculty, year, location, bio"
+        )
+        .eq("user_id", user.id)
+        .single<ProfileRow>()
+
+      if (error) {
+        console.error("プロフィール取得エラー", error)
+        return
+      }
+      if (!profile) return
+
+      setFormData({
+        firstName: profile.first_name ?? "",
+        lastName: profile.last_name ?? "",
+        email: profile.email ?? "",
+        phone: profile.phone ?? "",
+        university: profile.university ?? "",
+        faculty: profile.faculty ?? "",
+        year: profile.year ?? "",
+        location: profile.location ?? "",
+        bio: profile.bio ?? "",
+      })
+    }
+
+    fetchProfile()
+  }, [])
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
     const { name, value } = e.target
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSelectChange = (name, value) => {
+  const handleSelectChange = (
+    name: keyof typeof formData,
+    value: string
+  ) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (
+    e: React.FormEvent<HTMLFormElement> | React.MouseEvent<HTMLButtonElement>
+  ) => {
     e.preventDefault()
-    // ここでフォームデータを送信する処理を実装
-    console.log("フォームデータ:", formData)
-    // 成功したら通知を表示してプロフィールページに戻る
+
+    // 現在のユーザーを取得
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) {
+      alert("ログインしてください")
+      return
+    }
+
+    // -------------- auth.users 側のメールアドレスも更新 --------------
+    if (formData.email && formData.email !== user.email) {
+      const { error: emailError } = await supabase.auth.updateUser({
+        email: formData.email,
+      })
+      if (emailError) {
+        console.error("メールアドレス更新エラー", emailError)
+        alert("メールアドレスの更新に失敗しました")
+        return
+      }
+    }
+
+    // profiles テーブルの Insert 型を利用して型エラーを防ぐ
+    const updates: ProfileInsert = {
+      user_id: user.id,
+      first_name: formData.firstName,
+      last_name: formData.lastName,
+      email: formData.email, // プロフィール側にも保持
+      phone: formData.phone,
+      university: formData.university,
+      faculty: formData.faculty,
+      year: formData.year,
+      location: formData.location,
+      bio: formData.bio
+    }
+
+    const { error: upsertError } = await supabase
+      .from("profiles")
+      .upsert(updates as ProfileInsert, {
+        onConflict: "user_id"
+      })
+
+    if (upsertError) {
+      console.error("プロフィール更新エラー", upsertError)
+      alert("更新に失敗しました")
+      return
+    }
+
     alert("アカウント情報を更新しました")
-    // 実際の実装では、ここでAPIを呼び出してデータを保存します
+    router.push("/student/profile")
   }
 
   return (
@@ -70,7 +168,7 @@ export default function AccountEditPage() {
               <div className="flex items-center space-x-4">
                 <div className="relative">
                   <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-                    <span className="text-white text-2xl font-bold">田</span>
+                    <span className="text-white text-2xl font-bold">写真</span>
                   </div>
                   <Button
                     size="sm"
@@ -95,12 +193,22 @@ export default function AccountEditPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="firstName">姓</Label>
-                  <Input id="firstName" name="firstName" value={formData.firstName} onChange={handleChange} />
+                  <Label htmlFor="lastName">姓</Label>
+                  <Input
+                    id="lastName"
+                    name="lastName"
+                    value={formData.lastName}
+                    onChange={handleChange}
+                  />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="lastName">名</Label>
-                  <Input id="lastName" name="lastName" value={formData.lastName} onChange={handleChange} />
+                  <Label htmlFor="firstName">名</Label>
+                  <Input
+                    id="firstName"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                  />
                 </div>
               </div>
 

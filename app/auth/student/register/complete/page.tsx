@@ -18,7 +18,7 @@ export default function StudentRegisterCompletePage() {
       description: "自己紹介、スキル、経験を入力",
       time: "5分",
       priority: "high",
-      href: "/student/profile",
+      href: "/student/account/edit",
     },
     {
       icon: Target,
@@ -26,7 +26,7 @@ export default function StudentRegisterCompletePage() {
       description: "あなたに最適なキャリアを見つける",
       time: "10分",
       priority: "high",
-      href: "/student/assessment",
+      href: "/student/diagnosis",
     },
     {
       icon: Search,
@@ -34,7 +34,7 @@ export default function StudentRegisterCompletePage() {
       description: "条件に合う求人をチェック",
       time: "3分",
       priority: "medium",
-      href: "/student/jobs",
+      href: "/student/search",
     },
   ]
 
@@ -67,7 +67,7 @@ export default function StudentRegisterCompletePage() {
             </div>
             <DialogTitle className="text-center text-xl">🎉 登録完了！</DialogTitle>
             <DialogDescription className="text-center">
-              キャリプラへようこそ！
+              学転インターンへようこそ！
               <br />
               理想のキャリアを見つけるために、まずは以下のことから始めましょう。
             </DialogDescription>
@@ -76,7 +76,11 @@ export default function StudentRegisterCompletePage() {
           <div className="space-y-3">
             <h4 className="font-medium text-gray-900">すぐにやること</h4>
             {quickTasks.map((task, index) => (
-              <div key={index} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg">
+              <Link
+                key={index}
+                href={task.href}
+                className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
+              >
                 <div className="flex-shrink-0">
                   <task.icon className="h-5 w-5 text-blue-600" />
                 </div>
@@ -87,7 +91,7 @@ export default function StudentRegisterCompletePage() {
                 <Badge variant={task.priority === "high" ? "default" : "secondary"} className="text-xs">
                   {task.time}
                 </Badge>
-              </div>
+              </Link>
             ))}
           </div>
 

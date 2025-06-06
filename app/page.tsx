@@ -16,7 +16,51 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-export default function LandingPage() {
+
+const iconMap = {
+  MessageSquare,
+  Clock,
+  TrendingUp,
+  Star,
+  Users,
+  Building2,
+} as const
+
+type LandingFeature = {
+  id: string
+  title: string
+  description: string
+  icon: keyof typeof iconMap
+  color: string
+}
+
+import { createSupabaseServerClient } from "@/lib/supabase/server"
+
+export default async function LandingPage() {
+  // --- Supabase data fetch ---
+  const supabase = await createSupabaseServerClient()
+
+  const { data: heroData } = await (supabase as any)
+    .from("landing_hero")
+    .select("headline, subtitle, description")
+    .eq("is_active", true)
+    .single()
+
+  const { data: features } = await (supabase as any)
+    .from("landing_features")
+    .select("id, title, description, icon, color")
+    .order("display_order")
+
+  const typedFeatures = features as LandingFeature[] | null
+
+  // fallback so the page renders even if the table is empty
+  const hero = heroData ?? {
+    headline: "企業からリアルなフィードバック。",
+    subtitle: "キャリアの\"転換点\"が、もっとクリアになる。",
+    description:
+      "短期・単発OKの成長インターンで実務経験を積み、企業からの詳細なフィードバックを通じて自分の強みと課題を明確化。忙しい学生でも挑戦できるキャリア転換プラットフォーム。",
+  }
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
@@ -50,16 +94,12 @@ export default function LandingPage() {
               <AnimatedLogo className="mb-6" />
 
               <h1 className="text-3xl font-bold tracking-tighter sm:text-4xl md:text-5xl lg:text-6xl/none bg-gradient-to-r from-primary-500 to-primary-600 bg-clip-text text-transparent">
-                企業からリアルなフィードバック。
+                {hero.headline}
                 <br />
-                キャリアの"転換点"が、
-                <br />
-                もっとクリアになる。
+                {hero.subtitle}
               </h1>
               <p className="mx-auto max-w-[700px] text-gray-600 md:text-xl">
-                短期・単発OKの成長インターンで実務経験を積み、
-                企業からの詳細なフィードバックを通じて自分の強みと課題を明確化。
-                忙しい学生でも挑戦できるキャリア転換プラットフォーム。
+                {hero.description}
               </p>
               <div className="space-x-4 mt-8">
                 <Link href="/auth/student/login">
@@ -92,33 +132,24 @@ export default function LandingPage() {
               </p>
             </div>
             <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-3 lg:gap-12">
-              <Card className="border-2 hover:border-blue-200 transition-colors">
-                <CardHeader>
-                  <MessageSquare className="h-10 w-10 text-blue-600 mb-2" />
-                  <CardTitle>必須フィードバック</CardTitle>
-                  <CardDescription>
-                    企業は選考結果に必ず詳細なフィードバックを提供。 あなたの強みと改善点が明確になります。
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-              <Card className="border-2 hover:border-purple-200 transition-colors">
-                <CardHeader>
-                  <Clock className="h-10 w-10 text-purple-600 mb-2" />
-                  <CardTitle>柔軟な働き方</CardTitle>
-                  <CardDescription>
-                    週1回〜単発OK、未経験歓迎の案件が豊富。 忙しい学生でも挑戦できる機会を提供します。
-                  </CardDescription>
-                </CardHeader>
-              </Card>
-              <Card className="border-2 hover:border-green-200 transition-colors">
-                <CardHeader>
-                  <TrendingUp className="h-10 w-10 text-green-600 mb-2" />
-                  <CardTitle>成長の可視化</CardTitle>
-                  <CardDescription>
-                    経験とフィードバックを蓄積し、 キャリアダッシュボードで成長を実感できます。
-                  </CardDescription>
-                </CardHeader>
-              </Card>
+              {typedFeatures?.map((f) => {
+                const Icon =
+                  iconMap[f.icon as keyof typeof iconMap] ?? MessageSquare
+                return (
+                  <Card
+                    key={f.id}
+                    className="border-2 hover:border-blue-200 transition-colors"
+                  >
+                    <CardHeader>
+                      <Icon
+                        className={`h-10 w-10 text-${f.color}-600 mb-2`}
+                      />
+                      <CardTitle>{f.title}</CardTitle>
+                      <CardDescription>{f.description}</CardDescription>
+                    </CardHeader>
+                  </Card>
+                )
+              })}
             </div>
           </div>
         </section>
