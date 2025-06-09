@@ -1,6 +1,8 @@
+'use client'
 import { Button } from "@/components/ui/button"
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
+import { Input } from "@/components/ui/input"
 import { Logo, AnimatedLogo } from "@/components/logo"
 import {
   Users,
@@ -14,8 +16,10 @@ import {
   Smartphone,
   Monitor,
 } from "lucide-react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
-
+import { useEffect, useState } from "react"
+import { supabase } from "@/lib/supabase/client"
 
 const iconMap = {
   MessageSquare,
@@ -34,27 +38,86 @@ type LandingFeature = {
   color: string
 }
 
-import { createSupabaseServerClient } from "@/lib/supabase/server"
 
-export default async function LandingPage() {
+export default function LandingPage() {
+  const [stats, setStats] = useState({ applications: 0, interviews: 0, averageRating: 0 })
+  const [features, setFeatures] = useState<LandingFeature[] | null>(null)
+  const router = useRouter()
+  const [searchQuery, setSearchQuery] = useState("")
+  const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault()
+    const q = searchQuery.trim()
+    if (q) router.push(`/search=${encodeURIComponent(q)}`)
+  }
+
+  useEffect(() => {
+    const fetchStatsAndFeatures = async () => {
+      // ----- ログインユーザー情報 -----
+      const { data: { user } } = await supabase.auth.getUser()
+
+      if (user && user.email) {
+        const email = user.email
+
+        // ----- 応募総数取得 -----
+        const { count: appsCount, error: appsErr } = await supabase
+          .from("student_applications")
+          .select("id", { count: "exact", head: true })
+          .eq("email", email)
+
+        if (appsErr) console.error("applications fetch error", appsErr)
+
+        // ----- 面談予定数取得 -----
+        const { count: interviewsCount, error: interviewsErr } = await supabase
+          .from("student_applications")
+          .select("id", { count: "exact", head: true })
+          .eq("email", email)
+          .eq("status", "面談予定")
+
+        if (interviewsErr) console.error("interviews fetch error", interviewsErr)
+
+        // ----- 体験(評価)取得 -----
+        const { data: experiences, error: expErr } = await supabase
+          .from("student_experiences")
+          .select("rating")
+          .eq("email", email)
+
+        if (expErr) console.error("experiences fetch error", expErr)
+
+        // ----- 平均評価を計算 -----
+        const averageRating =
+          experiences && experiences.length > 0
+            ? experiences.reduce((sum, exp) => sum + (exp.rating as number), 0) /
+              experiences.length
+            : 0
+
+        setStats({
+          applications: appsCount ?? 0,
+          interviews: interviewsCount ?? 0,
+          averageRating,
+        })
+      }
+
+      // ----- ランディング用特徴取得 -----
+      const { data: landingFeatures, error: featErr } = await supabase
+        .from("landing_features")
+        .select("id, title, description, icon, color")
+        .order("display_order")
+
+      if (featErr) {
+        console.error("features fetch error", featErr)
+      } else {
+        setFeatures(landingFeatures as LandingFeature[] | null)
+      }
+    }
+
+    fetchStatsAndFeatures()
+  }, [])
+
   // --- Supabase data fetch ---
-  const supabase = await createSupabaseServerClient()
-
-  const { data: heroData } = await (supabase as any)
-    .from("landing_hero")
-    .select("headline, subtitle, description")
-    .eq("is_active", true)
-    .single()
-
-  const { data: features } = await (supabase as any)
-    .from("landing_features")
-    .select("id, title, description, icon, color")
-    .order("display_order")
-
-  const typedFeatures = features as LandingFeature[] | null
+  // (Keep the rest of the component as is, or move the async data fetching logic to useEffect if needed)
 
   // fallback so the page renders even if the table is empty
-  const hero = heroData ?? {
+  const hero = {
     headline: "企業からリアルなフィードバック。",
     subtitle: "キャリアの\"転換点\"が、もっとクリアになる。",
     description:
@@ -79,6 +142,18 @@ export default async function LandingPage() {
             企業向け
           </Link>
         </nav>
+        <form onSubmit={handleSearch} className="ml-4 flex items-center">
+          <Input
+            type="text"
+            placeholder="キーワード検索"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="h-8 w-32 sm:w-48"
+          />
+          <Button type="submit" size="sm" className="ml-2">
+            検索
+          </Button>
+        </form>
       </header>
 
       <main className="flex-1">
@@ -132,7 +207,7 @@ export default async function LandingPage() {
               </p>
             </div>
             <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-3 lg:gap-12">
-              {typedFeatures?.map((f) => {
+              {features?.map((f) => {
                 const Icon =
                   iconMap[f.icon as keyof typeof iconMap] ?? MessageSquare
                 return (

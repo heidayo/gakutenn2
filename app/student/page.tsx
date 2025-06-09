@@ -16,10 +16,13 @@ import {
   Bookmark,
   ChevronRight,
   Users,
+  GraduationCap,
   FileText,
   MoreHorizontal,
 } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase/client"
 import useEmblaCarousel from "embla-carousel-react"
 import Autoplay from "embla-carousel-autoplay"
 import { useCallback, useEffect, useState } from "react"
@@ -176,6 +179,16 @@ export default function StudentHomePage() {
   const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(1)
   const [favorites, setFavorites] = useState<number[]>([])
+  // 検索バー用
+  const [searchQuery, setSearchQuery] = useState("")
+  // 入力中のテキスト（Enter で確定）
+  const [searchInput, setSearchInput] = useState("")
+  const router = useRouter()
+
+  // ダッシュボード統計用
+  const [applicationsCount, setApplicationsCount] = useState<number | null>(null)
+  const [interviewsCount, setInterviewsCount] = useState<number | null>(null)
+  const [averageRating, setAverageRating] = useState<number | null>(null)
 
   // お気に入り状態をローカルストレージから読み込む
   useEffect(() => {
@@ -183,6 +196,52 @@ export default function StudentHomePage() {
     if (savedFavorites) {
       setFavorites(JSON.parse(savedFavorites))
     }
+  }, [])
+
+  // Supabase から応募数・面談数・平均評価を取得
+  useEffect(() => {
+    const fetchStats = async () => {
+      const {
+        data: { user },
+        error: userErr,
+      } = await supabase.auth.getUser()
+
+      if (userErr || !user) return
+
+      const userId = user.id
+
+      // 応募中
+      const { count: applyingCnt } = await supabase
+        .from("student_applications")
+        .select("id", { count: "exact", head: true })
+        .eq("student_id", userId)
+        .eq("status", "応募中")
+
+      // 面談予定
+      const { count: interviewCnt } = await supabase
+        .from("student_applications")
+        .select("id", { count: "exact", head: true })
+        .eq("student_id", userId)
+        .eq("status", "面談予定")
+
+      // 平均評価 (feedbacks テーブル想定)
+      const { data: ratingsRows } = await supabase
+        .from("feedbacks")
+        .select("rating")
+        .eq("student_id", userId)
+
+      let avg = null
+      if (ratingsRows && ratingsRows.length > 0) {
+        const total = ratingsRows.reduce((sum: number, row: any) => sum + (row.rating ?? 0), 0)
+        avg = Number((total / ratingsRows.length).toFixed(1))
+      }
+
+      setApplicationsCount(applyingCnt ?? 0)
+      setInterviewsCount(interviewCnt ?? 0)
+      setAverageRating(avg)
+    }
+
+    fetchStats()
   }, [])
 
   // お気に入り状態をローカルストレージに保存
@@ -239,6 +298,18 @@ export default function StudentHomePage() {
 
   const quickTags = ["週1OK", "未経験歓迎", "リモート可", "単発OK", "土日可", "高時給", "交通費支給"]
 
+  // クエリに応じて表示するジョブを絞り込む
+  const filteredJobs = displayedJobs.filter((job) => {
+    if (
+      searchQuery &&
+      !job.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
+      !job.company.toLowerCase().includes(searchQuery.toLowerCase())
+    ) {
+      return false
+    }
+    return true
+  })
+
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
       {/* Header */}
@@ -257,13 +328,25 @@ export default function StudentHomePage() {
 
       {/* Search Bar */}
       <div className="bg-white px-4 py-3">
-        <div className="relative">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            const q = searchInput.trim()
+            setSearchQuery(q)
+            if (q) {
+              router.push(`/student/search?query=${encodeURIComponent(q)}`)
+            }
+          }}
+          className="relative"
+        >
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
             placeholder="職種、キーワード、会社名"
-            className="pl-10 h-12 bg-gray-100 border-0 rounded-lg text-base"
+            className="pl-10 h-12 bg-gray-100 border-0 rounded-lg text-base w-full"
+            value={searchInput}
+            onChange={(e) => setSearchInput(e.target.value)}
           />
-        </div>
+        </form>
       </div>
 
       {/* Hero Carousel */}
@@ -283,13 +366,13 @@ export default function StudentHomePage() {
             </Link>
             <Link href="/student/search?type=internship" className="text-center">
               <div className="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center mb-2 mx-auto hover:bg-orange-700 transition-colors">
-                <MessageSquare className="h-6 w-6 text-white" />
+                <GraduationCap className="h-6 w-6 text-white" />
               </div>
               <div className="text-xs text-gray-700">インターン</div>
             </Link>
             <Link href="/student/feedback" className="text-center">
               <div className="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center mb-2 mx-auto hover:bg-orange-700 transition-colors">
-                <FileText className="h-6 w-6 text-white" />
+                <MessageSquare className="h-6 w-6 text-white" />
               </div>
               <div className="text-xs text-gray-700">フィードバック</div>
             </Link>
@@ -311,6 +394,11 @@ export default function StudentHomePage() {
               key={index}
               variant="secondary"
               className="whitespace-nowrap bg-orange-50 text-orange-700 hover:bg-orange-100 cursor-pointer"
+              onClick={() => {
+                setSearchInput(tag)
+                setSearchQuery(tag)
+                router.push(`/student/search?query=${encodeURIComponent(tag)}`)
+              }}
             >
               #{tag}
             </Badge>
@@ -322,15 +410,15 @@ export default function StudentHomePage() {
       <div className="px-4 py-4">
         <div className="grid grid-cols-3 gap-3">
           <Card className="p-3 text-center">
-            <div className="text-lg font-bold text-orange-600">12</div>
+            <div className="text-lg font-bold text-orange-600">{applicationsCount ?? "—"}</div>
             <div className="text-xs text-gray-600">応募中</div>
           </Card>
           <Card className="p-3 text-center">
-            <div className="text-lg font-bold text-green-600">8</div>
+            <div className="text-lg font-bold text-green-600">{interviewsCount ?? "—"}</div>
             <div className="text-xs text-gray-600">面談予定</div>
           </Card>
           <Card className="p-3 text-center">
-            <div className="text-lg font-bold text-purple-600">4.2</div>
+            <div className="text-lg font-bold text-purple-600">{averageRating ?? "—"}</div>
             <div className="text-xs text-gray-600">平均評価</div>
           </Card>
         </div>
@@ -349,7 +437,7 @@ export default function StudentHomePage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {displayedJobs.map((job) => (
+          {filteredJobs.map((job) => (
             <Link href={`/student/jobs/${job.id}`} key={job.id}>
               <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
                 <div className="relative">

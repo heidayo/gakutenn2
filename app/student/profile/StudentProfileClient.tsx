@@ -1,6 +1,6 @@
 "use client";
 
-import { FC, useEffect, useState } from "react";
+import { FC, useEffect, useState, useRef, ChangeEvent } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -29,13 +29,14 @@ type ProfileRow = {
   university: string | null;
   prefecture: string | null;
   phone: string | null;
+  avatar_url: string | null;
 };
 
 type Props = {
-  email: string;
+  email?: string; // optional; not currently used
 };
 
-const StudentProfileClient: FC<Props> = ({ email }) => {
+const StudentProfileClient: FC<Props> = ({ email: _email }) => {
   // ----- データ型 -----
   type Skill = { name: string; level: number };
   type Experience = {
@@ -57,30 +58,62 @@ const StudentProfileClient: FC<Props> = ({ email }) => {
   const [diagnosis, setDiagnosis] = useState<Diagnosis[]>([]);
   const [totalApplications, setTotalApplications] = useState<number>(0);
   const [profileInfo, setProfileInfo] = useState<ProfileRow | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ----- 初回マウント時に Supabase からデータを取得 -----
   useEffect(() => {
     const fetchData = async () => {
-      if (!email) return;
+      // Supabase Auth から user_id を取得
+      const {
+        data: { user: authUser },
+        error: authErr,
+      } = await supabase.auth.getUser();
+
+      if (authErr || !authUser) {
+        console.error("auth fetch error", authErr);
+        return;
+      }
+      const userId = authUser.id;
 
       // プロフィール取得
       const { data: profData, error: profErr } = await (supabase as any)
-        .from("student_profiles")
-        .select("full_name, university, prefecture, phone")
-        .eq("email", email)
+        .from("profiles")
+        .select("full_name, university, phone, avatar_url")
+        .eq("user_id", userId)
         .single();
+
+      console.log("profData ↓↓↓", profData);   // ←★ 追加
+      console.log("profErr  ↓↓↓", profErr);     // ←★ 追加
 
       if (profErr) {
         console.error("profile fetch error", profErr);
       } else {
         setProfileInfo(profData as ProfileRow);
-      }
+
+        // ── avatarUrl の取得ロジック ──────────────────────────────
+        const rawAvatarPath = (profData as any)?.avatar_url;
+        if (rawAvatarPath) {
+          // ① すでにフル URL が保存されている場合
+          if (rawAvatarPath.startsWith("http")) {
+            setAvatarUrl(rawAvatarPath);
+          } else {
+            // ② オブジェクトパスのみの場合は公開 URL を生成
+            const {
+              data: { publicUrl },
+            } = (supabase as any)
+              .storage
+              .from("student.profile.picture")
+              .getPublicUrl(rawAvatarPath);
+            setAvatarUrl(publicUrl);
+          }
+        }
 
       // スキル取得
       const { data: skillData, error: skillErr } = await (supabase as any)
         .from("student_skills")
         .select("name, level")
-        .eq("email", email);
+        .eq("user_id", userId);
 
       if (skillErr) {
         console.error("skill fetch error", skillErr);
@@ -92,7 +125,7 @@ const StudentProfileClient: FC<Props> = ({ email }) => {
       const { data: expData, error: expErr } = await (supabase as any)
         .from("student_experiences")
         .select("company, role, period, rating, feedback")
-        .eq("email", email)
+        .eq("user_id", userId)
         .order("period", { ascending: false });
 
       if (expErr) {
@@ -105,7 +138,7 @@ const StudentProfileClient: FC<Props> = ({ email }) => {
       const { data: diagData, error: diagErr } = await (supabase as any)
         .from("student_diagnosis_results")
         .select("category, score, comment")
-        .eq("email", email);
+        .eq("user_id", userId);
 
       if (diagErr) {
         console.error("diagnosis fetch error", diagErr);
@@ -117,17 +150,61 @@ const StudentProfileClient: FC<Props> = ({ email }) => {
       const { count: appsCount, error: appsErr } = await (supabase as any)
         .from("student_applications")
         .select("id", { count: "exact", head: true })
-        .eq("email", email);
+        .eq("user_id", userId);
 
       if (appsErr) {
         console.error("applications fetch error", appsErr);
       } else {
         setTotalApplications(appsCount ?? 0);
       }
-    };
+    }    // ← close the outer `else` block
+    };   // ← close fetchData
 
     fetchData();
-  }, [email]);
+  }, []);
+
+  // ----- アバターアップロード処理 -----
+  const handleAvatarUpload = async (e: ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // user_id を取得
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
+    if (!authUser) return;
+    const userId = authUser.id;
+
+    const filePath = `${userId}-${Date.now()}`;
+
+    // ストレージへアップロード
+    const { error: uploadErr } = await (supabase as any)
+      .storage
+      .from("student.profile.picture")
+      .upload(filePath, file, { upsert: true });
+
+    if (uploadErr) {
+      console.error("avatar upload error", uploadErr);
+      return;
+    }
+
+    // プロフィールテーブルを更新
+    const { error: updateErr } = await (supabase as any)
+      .from("profiles")
+      .update({ avatar_url: filePath })
+      .eq("user_id", userId);
+
+    if (updateErr) {
+      console.error("avatar url update error", updateErr);
+      return;
+    }
+
+    const {
+      data: { publicUrl },
+    } = (supabase as any).storage.from("student.profile.picture").getPublicUrl(filePath);
+
+    setAvatarUrl(publicUrl);
+  };
 
   // ----- 平均評価を計算 -----
   const averageRating =
@@ -162,17 +239,33 @@ const StudentProfileClient: FC<Props> = ({ email }) => {
           <CardContent className="pt-6">
             <div className="flex items-center space-x-4">
               <div className="relative">
-                <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-                  <span className="text-white text-2xl font-bold">
-                    {profileInfo?.full_name?.charAt(0) ?? ""}
-                  </span>
-                </div>
+                {avatarUrl ? (
+                  <img
+                    src={avatarUrl}
+                    alt="avatar"
+                    className="w-20 h-20 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+                    <span className="text-white text-2xl font-bold">
+                      {profileInfo?.full_name?.charAt(0) ?? ""}
+                    </span>
+                  </div>
+                )}
                 <Button
                   size="sm"
                   className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full p-0 bg-white border-2 border-gray-200"
+                  onClick={() => fileInputRef.current?.click()}
                 >
                   <Camera className="h-3 w-3 text-gray-600" />
                 </Button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  className="hidden"
+                  onChange={handleAvatarUpload}
+                />
               </div>
               <div className="flex-1">
                 <h2 className="text-xl font-bold">
@@ -181,10 +274,6 @@ const StudentProfileClient: FC<Props> = ({ email }) => {
                 <div className="flex items-center space-x-1 text-gray-600 text-sm mt-1">
                   <GraduationCap className="h-4 w-4" />
                   <span>{profileInfo?.university ?? "大学名未登録"}</span>
-                </div>
-                <div className="flex items-center space-x-1 text-gray-600 text-sm mt-1">
-                  <MapPin className="h-4 w-4" />
-                  <span>{profileInfo?.prefecture ?? "所在地未登録"}</span>
                 </div>
                 <div className="flex items-center space-x-1 text-gray-600 text-sm mt-1">
                   <Phone className="h-4 w-4" />

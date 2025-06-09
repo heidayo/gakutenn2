@@ -28,9 +28,6 @@ export default async function StudentProfilePage() {
     .single<ProfileRow>();
 
   return (
-    <StudentProfileClient
-      profile={profile}
-      email={user.email ?? ""}
-    />
+   <StudentProfileClient email={user.email ?? ""} />
   );
 }

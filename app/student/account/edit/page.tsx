@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { type Database } from "@/lib/supabase/types" 
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
@@ -18,6 +18,7 @@ type ProfileRow = Database["public"]["Tables"]["profiles"]["Row"]
 
 export default function AccountEditPage() {
   const router = useRouter()
+  const fileInputRef = useRef<HTMLInputElement>(null)
   type ProfileInsert =
    Database["public"]["Tables"]["profiles"]["Insert"]
 
@@ -31,7 +32,7 @@ export default function AccountEditPage() {
     year: "",
     location: "",
     bio: "",
-    
+    avatarUrl: "",
   })
 
   useEffect(() => {
@@ -42,7 +43,7 @@ export default function AccountEditPage() {
       const { data: profile, error } = await supabase
         .from("profiles")
         .select(
-          "first_name, last_name, email, phone, university, faculty, year, location, bio"
+          "first_name, last_name, email, phone, university, faculty, year, location, bio, avatar_url"
         )
         .eq("user_id", user.id)
         .single<ProfileRow>()
@@ -63,6 +64,7 @@ export default function AccountEditPage() {
         year: profile.year ?? "",
         location: profile.location ?? "",
         bio: profile.bio ?? "",
+        avatarUrl: profile.avatar_url ?? "",
       })
     }
 
@@ -81,6 +83,34 @@ export default function AccountEditPage() {
     value: string
   ) => {
     setFormData((prev) => ({ ...prev, [name]: value }))
+  }
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      alert("ログインしてください")
+      return
+    }
+
+    const fileExt = file.name.split(".").pop()
+    const filePath = `avatar-${user.id}.${fileExt}`
+
+    const { error: uploadError } = await supabase.storage
+      .from("student.profile.picture")
+      .upload(filePath, file, { upsert: true })
+
+    if (uploadError) {
+      console.error("画像アップロード失敗", uploadError)
+      alert("画像のアップロードに失敗しました")
+      return
+    }
+
+    const { data } = supabase.storage.from("student.profile.picture").getPublicUrl(filePath)
+    const publicUrl = data.publicUrl
+    setFormData(prev => ({ ...prev, avatarUrl: publicUrl }))
   }
 
   const handleSubmit = async (
@@ -120,7 +150,8 @@ export default function AccountEditPage() {
       faculty: formData.faculty,
       year: formData.year,
       location: formData.location,
-      bio: formData.bio
+      bio: formData.bio,
+      avatar_url: formData.avatarUrl,
     }
 
     const { error: upsertError } = await supabase
@@ -167,19 +198,37 @@ export default function AccountEditPage() {
             <CardContent>
               <div className="flex items-center space-x-4">
                 <div className="relative">
-                  <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-                    <span className="text-white text-2xl font-bold">写真</span>
-                  </div>
+                  {formData.avatarUrl ? (
+                    <img
+                      src={formData.avatarUrl}
+                      alt="プロフィール画像"
+                      className="w-20 h-20 rounded-full object-cover"
+                    />
+                  ) : (
+                    <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+                      <span className="text-white text-2xl font-bold">写真</span>
+                    </div>
+                  )}
                   <Button
                     size="sm"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
                     className="absolute -bottom-1 -right-1 w-8 h-8 rounded-full p-0 bg-white border-2 border-gray-200"
                   >
                     <Camera className="h-4 w-4 text-gray-600" />
                   </Button>
+                  {/* Hidden file input */}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    ref={fileInputRef}
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
                 </div>
                 <div className="text-sm text-gray-600">
                   <p>プロフィール写真を変更</p>
-                  <p className="text-xs mt-1">JPG、PNG、GIF形式（最大5MB）</p>
+                  <p className="text-xs mt-1">JPG、PNG、GIF形式（最大50MB）</p>
                 </div>
               </div>
             </CardContent>
