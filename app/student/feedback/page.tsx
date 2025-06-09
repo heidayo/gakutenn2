@@ -20,68 +20,72 @@ import {
   Building2,
 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase/client"
 
 export default function FeedbackListPage() {
   const [selectedCategory, setSelectedCategory] = useState("すべて")
 
-  const feedbackStats = {
-    totalFeedbacks: 12,
-    averageRating: 4.3,
-    improvementRate: 85,
-    learningNotes: 8,
-  }
+  const [feedbackStats, setFeedbackStats] = useState({
+    totalFeedbacks: 0,
+    averageRating: 0,
+    improvementRate: 0,
+    learningNotes: 0,
+  });
 
-  const feedbackList = [
-    {
-      id: 1,
-      company: "株式会社テックスタート",
-      role: "Webマーケティングアシスタント",
-      rating: 4.5,
-      date: "2024年5月28日",
-      isNew: true,
-      hasLearningNote: false,
-      preview: "積極的に取り組み、データ分析スキルが向上しました。今後はプレゼンテーション力を...",
-      category: "マーケティング",
-      duration: "2週間",
-    },
-    {
-      id: 2,
-      company: "クリエイティブ合同会社",
-      role: "SNS運用サポート",
-      rating: 4.8,
-      date: "2024年5月20日",
-      isNew: false,
-      hasLearningNote: true,
-      preview: "クリエイティブな発想力と実行力が素晴らしかったです。チームワークも...",
-      category: "クリエイティブ",
-      duration: "1ヶ月",
-    },
-    {
-      id: 3,
-      company: "イノベーション株式会社",
-      role: "データ分析補助",
-      rating: 4.2,
-      date: "2024年5月15日",
-      isNew: false,
-      hasLearningNote: true,
-      preview: "丁寧な作業で信頼できます。Excel スキルが大幅に向上しました...",
-      category: "データ分析",
-      duration: "3週間",
-    },
-    {
-      id: 4,
-      company: "マーケティングプロ",
-      role: "市場調査アシスタント",
-      rating: 4.0,
-      date: "2024年5月10日",
-      isNew: false,
-      hasLearningNote: false,
-      preview: "基本的なリサーチスキルは身についています。より深い分析力を...",
-      category: "リサーチ",
-      duration: "2週間",
-    },
-  ]
+  const [feedbackList, setFeedbackList] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchFeedbacks = async () => {
+      // ① 現在ログインしているユーザーを取得
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // ② フィードバック一覧を取得（テーブル名・カラムはスキーマに合わせて調整）
+      const { data, error } = await supabase
+        .from("student_feedbacks")         // ★テーブル名を合わせてください
+        .select("*")
+        .eq("student_id", user.id);
+
+      if (error) {
+        console.error("student_feedbacks fetch error", error);
+        return;
+      }
+
+      // ③ UI 用に整形
+      const formatted = (data ?? []).map((f: any) => ({
+        id: f.id,
+        company: f.company_name,
+        role: f.role,
+        rating: f.rating,
+        date: f.feedback_date,            // 例: "2025-06-01"
+        isNew: f.is_new,
+        hasLearningNote: !!f.learning_note,
+        preview: f.preview_text,
+        category: f.category,
+        duration: f.duration_weeks ? `${f.duration_weeks}週間` : "",
+      }));
+
+      setFeedbackList(formatted);
+
+      // ④ 統計計算
+      const total = formatted.length;
+      const avg =
+        total > 0
+          ? formatted.reduce((sum: number, f: any) => sum + (f.rating ?? 0), 0) / total
+          : 0;
+      const notes = formatted.filter((f: any) => f.hasLearningNote).length;
+
+      setFeedbackStats({
+        totalFeedbacks: total,
+        averageRating: Number(avg.toFixed(1)),
+        improvementRate: 0, // ← 必要に応じて計算ロジックを追加
+        learningNotes: notes,
+      });
+    };
+
+    fetchFeedbacks();
+  }, []);
 
   const categories = ["すべて", "マーケティング", "クリエイティブ", "データ分析", "リサーチ"]
 

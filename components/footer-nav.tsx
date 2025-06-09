@@ -8,7 +8,7 @@ import {
   Search,
   User,
   MessageSquare,
-  MoreHorizontal,
+  LayoutDashboard,
 } from "lucide-react";
 
 /** bottom-navigation height（h-16 = 64px）と同じだけ
@@ -19,8 +19,8 @@ const items = [
   { href: "/student", icon: Home, label: "ホーム" },
   { href: "/student/search", icon: Search, label: "探す" },
   { href: "/student/profile", icon: User, label: "プロフィール" },
+  { href: "/student/dashboard", icon: LayoutDashboard, label: "ダッシュボード" },
   { href: "/student/feedback", icon: MessageSquare, label: "フィードバック" },
-  { href: "/student/other", icon: MoreHorizontal, label: "その他" },
 ] as const;
 
 export default function FooterNav() {

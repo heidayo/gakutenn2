@@ -320,7 +320,7 @@ export default function StudentHomePage() {
           <Link href="/student/favorites">
             <Bookmark className="h-6 w-6 text-gray-600" />
           </Link>
-          <Link href="/student/profile">
+          <Link href="/student/other">
             <User className="h-6 w-6 text-gray-600" />
           </Link>
         </div>

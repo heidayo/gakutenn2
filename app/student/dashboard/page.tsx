@@ -1,3 +1,7 @@
+"use client";
+
+import React, { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -21,48 +25,97 @@ import {
 import Link from "next/link"
 
 export default function StudentDashboardPage() {
-  const upcomingInterviews = [
-    {
-      company: "株式会社テックスタート",
-      role: "Webマーケティングアシスタント",
-      date: "2024年6月5日",
-      time: "14:00",
-      type: "オンライン面談",
-    },
-    {
-      company: "イノベーション株式会社",
-      role: "データ分析補助",
-      date: "2024年6月7日",
-      time: "16:30",
-      type: "対面面談",
-    },
-  ]
 
-  const recentFeedback = [
-    {
-      company: "クリエイティブ合同会社",
-      role: "SNS運用サポート",
-      rating: 4.8,
-      comment:
-        "クリエイティブな発想力と実行力が素晴らしかったです。今後はデータ分析スキルを身につけると更に成長できると思います。",
-      date: "2024年5月28日",
-      isNew: true,
-    },
-    {
-      company: "株式会社マーケティングプロ",
-      role: "市場調査アシスタント",
-      rating: 4.2,
-      comment: "丁寧な作業で信頼できます。プレゼンテーション力を向上させることをお勧めします。",
-      date: "2024年5月20日",
-      isNew: false,
-    },
-  ]
+  // ─── Supabase‑driven state ──────────────────────────────
+  const [totalApplications, setTotalApplications] = useState<number>(0);
+  const [averageRating, setAverageRating] = useState<number>(0);
+  const [acceptedCount, setAcceptedCount] = useState<number>(0);
+  const [ongoingCount, setOngoingCount] = useState<number>(0);
 
-  const goals = [
-    { title: "月3件の応募", current: 2, target: 3, progress: 67 },
-    { title: "平均評価4.5以上", current: 4.3, target: 4.5, progress: 96 },
-    { title: "新スキル習得", current: 1, target: 2, progress: 50 },
-  ]
+  const [upcomingInterviews, setUpcomingInterviews] = useState<any[]>([]);
+  const [recentFeedback, setRecentFeedback] = useState<any[]>([]);
+  const [goals, setGoals] = useState<
+    { title: string; current: number; target: number; progress: number }[]
+  >([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const userId = user.id;
+
+      // ── Applications & status counts ─────────────────────
+      const { data: apps } = await supabase
+        .from("student_applications")
+        .select("status")
+        .eq("user_id", userId);
+
+      if (apps) {
+        setTotalApplications(apps.length);
+        setAcceptedCount(apps.filter(a => a.status === "合格").length);
+        setOngoingCount(apps.filter(a => a.status === "進行中").length);
+      }
+
+      // ── Feedback ────────────────────────────────────────
+      const { data: fb } = await supabase
+        .from("feedback")
+        .select("company, role, rating, comment, date")
+        .eq("student_id", userId)
+        .order("date", { ascending: false })
+        .limit(5);
+
+      if (fb) {
+        setRecentFeedback(
+          fb.map(f => ({
+            ...f,
+            isNew: new Date(f.date) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+          }))
+        );
+        if (fb.length) {
+          const avg = fb.reduce((s, f) => s + (f.rating || 0), 0) / fb.length;
+          setAverageRating(Number(avg.toFixed(1)));
+        }
+      }
+
+      // ── Interviews ──────────────────────────────────────
+      const { data: iv } = await supabase
+        .from("interviews")
+        .select("company, role, scheduled_at, type")
+        .eq("student_id", userId)
+        .gte("scheduled_at", new Date().toISOString())
+        .order("scheduled_at");
+
+      if (iv) {
+        setUpcomingInterviews(
+          iv.map(i => ({
+            company: i.company,
+            role: i.role,
+            date: new Date(i.scheduled_at).toLocaleDateString("ja-JP"),
+            time: new Date(i.scheduled_at).toLocaleTimeString("ja-JP", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            type: i.type ?? "面談",
+          }))
+        );
+      }
+
+      // ── Monthly goals (example calc) ────────────────────
+      const total = apps?.length ?? 0;
+      const progressApplications = Math.min(Math.round((total / 3) * 100), 100);
+      const progressRating = averageRating
+        ? Math.min(Math.round((averageRating / 4.5) * 100), 100)
+        : 0;
+
+      setGoals([
+        { title: "月3件の応募", current: total, target: 3, progress: progressApplications },
+        { title: "平均評価4.5以上", current: averageRating, target: 4.5, progress: progressRating },
+        { title: "新スキル習得", current: 1, target: 2, progress: 50 },
+      ]);
+    };
+
+    fetchData();
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -83,7 +136,7 @@ export default function StudentDashboardPage() {
             <div className="flex items-center space-x-2">
               <TrendingUp className="h-5 w-5 text-green-600" />
               <div>
-                <div className="text-lg font-bold text-green-600">15</div>
+                <div className="text-lg font-bold text-green-600">{totalApplications}</div>
                 <div className="text-xs text-gray-600">総応募数</div>
               </div>
             </div>
@@ -92,7 +145,7 @@ export default function StudentDashboardPage() {
             <div className="flex items-center space-x-2">
               <Star className="h-5 w-5 text-yellow-600" />
               <div>
-                <div className="text-lg font-bold text-yellow-600">4.3</div>
+                <div className="text-lg font-bold text-yellow-600">{averageRating || 0}</div>
                 <div className="text-xs text-gray-600">平均評価</div>
               </div>
             </div>
@@ -101,7 +154,7 @@ export default function StudentDashboardPage() {
             <div className="flex items-center space-x-2">
               <CheckCircle className="h-5 w-5 text-blue-600" />
               <div>
-                <div className="text-lg font-bold text-blue-600">8</div>
+                <div className="text-lg font-bold text-blue-600">{acceptedCount}</div>
                 <div className="text-xs text-gray-600">合格数</div>
               </div>
             </div>
@@ -110,10 +163,21 @@ export default function StudentDashboardPage() {
             <div className="flex items-center space-x-2">
               <Clock className="h-5 w-5 text-purple-600" />
               <div>
-                <div className="text-lg font-bold text-purple-600">3</div>
+                <div className="text-lg font-bold text-purple-600">{ongoingCount}</div>
                 <div className="text-xs text-gray-600">進行中</div>
               </div>
             </div>
+          </Card>
+        </div>
+
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 gap-4">
+          <Card className="p-4">
+            <Link href="/student/applications" className="flex flex-col items-center text-center space-y-2">
+              <CheckCircle className="h-8 w-8 text-blue-600" />
+              <div className="text-sm font-semibold">応募状況</div>
+              <div className="text-xs text-gray-600">進捗を確認</div>
+            </Link>
           </Card>
         </div>
 
@@ -212,23 +276,6 @@ export default function StudentDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-2 gap-4">
-          <Card className="p-4">
-            <Link href="/student/applications" className="flex flex-col items-center text-center space-y-2">
-              <CheckCircle className="h-8 w-8 text-blue-600" />
-              <div className="text-sm font-semibold">応募状況</div>
-              <div className="text-xs text-gray-600">進捗を確認</div>
-            </Link>
-          </Card>
-          <Card className="p-4">
-            <Link href="/student/diagnosis" className="flex flex-col items-center text-center space-y-2">
-              <Target className="h-8 w-8 text-purple-600" />
-              <div className="text-sm font-semibold">志向性診断</div>
-              <div className="text-xs text-gray-600">適性を診断</div>
-            </Link>
-          </Card>
-        </div>
       </div>
 
       {/* Bottom Navigation */}

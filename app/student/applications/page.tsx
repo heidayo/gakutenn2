@@ -19,65 +19,104 @@ import {
   ChevronRight,
 } from "lucide-react"
 import Link from "next/link"
+import { cookies } from "next/headers";
+import { createServerClient } from "@supabase/ssr";
 
-export default function ApplicationsPage() {
-  const stats = {
-    total: 15,
-    inProgress: 8,
-    passed: 5,
-    rejected: 2,
+export default async function ApplicationsPage() {
+  // ── Supabase client ─────────────────────────────────────────────
+  const supabaseUrl  = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error(
+      [
+        "❌ Supabase env vars are missing.",
+        `NEXT_PUBLIC_SUPABASE_URL = ${supabaseUrl}`,
+        `NEXT_PUBLIC_SUPABASE_ANON_KEY = ${
+          supabaseAnonKey ? supabaseAnonKey.slice(0, 10) + "…" : supabaseAnonKey
+        }`,
+        "Check your .env.local (development) or Vercel env vars (production).",
+      ].join("\n")
+    );
   }
 
-  const applications = [
-    {
-      id: 1,
-      company: "株式会社テックスタート",
-      role: "Webマーケティングアシスタント",
-      appliedDate: "2024年6月1日",
-      status: "面談予定",
-      statusColor: "bg-blue-100 text-blue-800",
-      nextStep: "オンライン面談",
-      nextDate: "2024年6月5日 14:00",
-      progress: 50,
-      hasUpdate: true,
+  // Cookie wrapper (read‑only; get だけ実装、set/remove は no‑op)
+  const cookieStore: any = (await (async () => cookies())()); // handles both sync / async typings
+
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      get:    (name: string) => cookieStore?.get?.(name)?.value,
+      set:    () => { /* no‑op on server component */ },
+      remove: () => { /* no‑op on server component */ },
     },
-    {
-      id: 2,
-      company: "クリエイティブ合同会社",
-      role: "SNS運用サポート",
-      appliedDate: "2024年5月28日",
-      status: "書類選考中",
-      statusColor: "bg-yellow-100 text-yellow-800",
-      nextStep: "書類選考結果",
-      nextDate: "2024年6月3日まで",
-      progress: 25,
-      hasUpdate: false,
-    },
-    {
-      id: 3,
-      company: "イノベーション株式会社",
-      role: "データ分析補助",
-      appliedDate: "2024年5月25日",
-      status: "合格",
-      statusColor: "bg-green-100 text-green-800",
-      nextStep: "勤務開始",
-      nextDate: "2024年6月10日",
-      progress: 100,
-      hasUpdate: false,
-    },
-    {
-      id: 4,
-      company: "マーケティングプロ",
-      role: "市場調査アシスタント",
-      appliedDate: "2024年5月20日",
-      status: "不合格",
-      statusColor: "bg-red-100 text-red-800",
-      nextStep: "フィードバック確認",
-      nextDate: "",
-      progress: 100,
-      hasUpdate: true,
-    },
-  ]
+  });
+
+  // ───────────── dev helper ─────────────
+  if (process.env.NODE_ENV === "development") {
+    console.log("[Supabase] server client initialised on ApplicationsPage");
+  }
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    return <div className="p-6">このページを見るにはログインが必要です。</div>;
+  }
+
+  // student_id は auth.user.id と一致している前提
+  const { data: rawApps, error } = await supabase
+    .from("student_applications_view") // ★ビュー名は実環境に合わせて変更
+    .select(`
+      id,
+      company:company_name,
+      role:job_title,
+      applied_date,
+      status,
+      next_step,
+      next_date,
+      progress
+    `)
+    .eq("student_id", session.user.id)
+    .order("applied_date", { ascending: false });
+
+  if (error) console.error("applications fetch error", error);
+
+  // ── helpers ────────────────────────────────────────────────────
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "面談予定":
+        return "bg-blue-100 text-blue-800";
+      case "書類選考中":
+        return "bg-yellow-100 text-yellow-800";
+      case "合格":
+        return "bg-green-100 text-green-800";
+      case "不合格":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const applications = (rawApps ?? []).map((row) => ({
+    ...row,
+    progress:
+      row.progress ??
+      (row.status === "合格" || row.status === "不合格"
+        ? 100
+        : row.status === "面談予定"
+        ? 50
+        : 25),
+    appliedDate: row.applied_date
+      ? new Date(row.applied_date).toLocaleDateString("ja-JP")
+      : "",
+  }));
+
+  const stats = {
+    total: applications.length,
+    inProgress: applications.filter((a) =>
+      ["面談予定", "書類選考中"].includes(a.status)
+    ).length,
+    passed: applications.filter((a) => a.status === "合格").length,
+    rejected: applications.filter((a) => a.status === "不合格").length,
+  };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -156,7 +195,6 @@ export default function ApplicationsPage() {
                       <div className="flex items-center space-x-2 mb-1">
                         <Building2 className="h-4 w-4 text-gray-500" />
                         <span className="text-sm text-gray-600">{app.company}</span>
-                        {app.hasUpdate && <div className="w-2 h-2 bg-red-500 rounded-full"></div>}
                       </div>
                       <h3 className="font-semibold text-base mb-1">{app.role}</h3>
                       <div className="flex items-center space-x-1 text-xs text-gray-500 mb-2">
@@ -165,7 +203,7 @@ export default function ApplicationsPage() {
                       </div>
                     </div>
                     <div className="flex flex-col items-end space-y-1">
-                      <Badge className={app.statusColor}>
+                      <Badge className={getStatusColor(app.status)}>
                         {getStatusIcon(app.status)}
                         <span className="ml-1">{app.status}</span>
                       </Badge>
@@ -187,9 +225,9 @@ export default function ApplicationsPage() {
                     <div className="flex items-center justify-between">
                       <div>
                         <div className="text-xs font-semibold text-gray-700">次のステップ</div>
-                        <div className="text-xs text-gray-600">{app.nextStep}</div>
+                        <div className="text-xs text-gray-600">{app.next_step}</div>
                       </div>
-                      {app.nextDate && <div className="text-xs text-gray-600">{app.nextDate}</div>}
+                      {app.next_date && <div className="text-xs text-gray-600">{app.next_date}</div>}
                     </div>
                   </div>
                 </CardContent>
