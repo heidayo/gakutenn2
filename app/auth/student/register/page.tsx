@@ -4,6 +4,7 @@ import { useState } from "react"
 import Link from "next/link"
 import { supabase } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
+import type { Database } from "@/lib/supabase/types"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -128,23 +129,32 @@ export default function StudentRegisterPage() {
         return
       }
 
-      // 2) プロフィールテーブルに基本情報を保存 / 更新
+      // 2) プロフィールテーブルに基本情報を保存
       if (data?.user) {
+        // grade を数値 year にマッピング（該当しなければ 0 = 未設定）
+        const yearValue =
+          ["1", "2", "3", "4"].includes(formData.grade) ? Number(formData.grade) : 0
+
+        const insertPayload: Database["public"]["Tables"]["students"]["Insert"] = {
+          id: data.user.id,
+          email: formData.email,
+          // 必須列
+          name: `${formData.lastName} ${formData.firstName}`,
+          university: formData.university,
+          major: formData.major,           // ← NOT NULL major
+          year: yearValue,                 // NOT NULL integer
+          // 任意列
+          phone: formData.phone || null,
+          first_name: formData.firstName || null,
+          last_name: formData.lastName || null,
+          full_name: `${formData.lastName} ${formData.firstName}`,
+          faculty: null,                   // 今回は未使用
+          user_id: data.user.id,           // RLS 用に保持（nullable 列）
+        }
+
         const { error: profileError } = await supabase
-          .from("profiles")
-          .upsert(
-            {
-              user_id: data.user.id,                       // RLS で本人のみ更新可
-              email: formData.email,
-              first_name: formData.firstName,
-              last_name: formData.lastName,
-              full_name: `${formData.lastName} ${formData.firstName}`,
-              university: formData.university,
-              faculty: formData.major,                     // 専攻を faculty に一旦格納
-              phone: formData.phone,
-            },
-            { onConflict: "user_id" }                     // 既存レコードがあれば更新
-          )
+          .from("students")
+          .insert(insertPayload)
 
         if (profileError) {
           setErrors({ submit: profileError.message })

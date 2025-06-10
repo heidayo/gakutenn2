@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -8,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Checkbox } from "@/components/ui/checkbox"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import { Separator } from "@/components/ui/separator"
 import {
@@ -19,11 +21,11 @@ import {
   EyeOff,
   ArrowLeft,
   ArrowRight,
-  CheckCircle,
   AlertCircle,
 } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { Database } from "@/lib/supabase/types"
 
 export default function CompanyRegisterPage() {
   const router = useRouter()
@@ -37,15 +39,10 @@ export default function CompanyRegisterPage() {
     confirmPassword: "",
     firstName: "",
     lastName: "",
-    position: "",
     phone: "",
 
     // ステップ2: 法人情報
     companyName: "",
-    companyNameKana: "",
-    registrationNumber: "",
-    establishedYear: "",
-    employeeCount: "",
     industry: "",
     website: "",
     description: "",
@@ -84,7 +81,6 @@ export default function CompanyRegisterPage() {
 
     if (!formData.firstName) newErrors.firstName = "名前は必須です"
     if (!formData.lastName) newErrors.lastName = "姓は必須です"
-    if (!formData.position) newErrors.position = "役職は必須です"
 
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
@@ -94,10 +90,6 @@ export default function CompanyRegisterPage() {
     const newErrors: Record<string, string> = {}
 
     if (!formData.companyName) newErrors.companyName = "会社名は必須です"
-    if (!formData.companyNameKana) newErrors.companyNameKana = "会社名（カナ）は必須です"
-    if (!formData.registrationNumber) newErrors.registrationNumber = "法人番号は必須です"
-    if (!formData.establishedYear) newErrors.establishedYear = "設立年は必須です"
-    if (!formData.employeeCount) newErrors.employeeCount = "従業員数は必須です"
     if (!formData.industry) newErrors.industry = "業界は必須です"
     if (!formData.website) newErrors.website = "ウェブサイトは必須です"
     else if (!/^https?:\/\/.+/.test(formData.website)) {
@@ -160,16 +152,61 @@ export default function CompanyRegisterPage() {
   }
 
   const handleSubmit = async () => {
+    if (loading) return
     setLoading(true)
+    setErrors({}) // clear previous errors
 
     try {
-      // 企業登録API呼び出し（模擬）
-      await new Promise((resolve) => setTimeout(resolve, 2000))
+      // 1) ユーザー登録
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          data: {
+            first_name: formData.firstName,
+            last_name: formData.lastName,
+            phone: formData.phone,
+            role: formData.role,
+          },
+          emailRedirectTo: `${location.origin}/auth/callback`,
+        },
+      })
 
-      // 法人確認・管理者承認待ちページへ遷移
-      router.push("/auth/company/register/pending")
-    } catch (error) {
-      console.error("Registration failed:", error)
+      if (authError) {
+        setErrors({ submit: authError.message })
+        return
+      }
+
+      // 2) 企業テーブルへ登録
+      if (authData?.user) {
+        // Supabase 上の companies テーブルは address だけを持つ想定
+        const fullAddress =
+          `${formData.postalCode} ${formData.prefecture}${formData.city}${formData.address}${
+            formData.building ? " " + formData.building : ""
+          }`.trim()
+
+        const insertPayload: Database["public"]["Tables"]["companies"]["Insert"] = {
+          name: formData.companyName,
+          industry: formData.industry || null,
+          website: formData.website || null,
+          description: formData.description || null,
+          user_id: authData.user.id,
+          address: fullAddress || null, // 1本化した住所
+          email: formData.email,
+          // そのほかスキーマに存在する列のみ指定
+        }
+
+        const { error: companyError } = await supabase.from("companies").insert(insertPayload)
+        if (companyError) {
+          setErrors({ submit: companyError.message })
+          return
+        }
+      }
+
+      // 3) 完了ページへ遷移
+      router.push("/auth/company/register/complete")
+    } catch (err: any) {
+      setErrors({ submit: err.message ?? "登録に失敗しました。もう一度お試しください。" })
     } finally {
       setLoading(false)
     }
@@ -376,17 +413,6 @@ export default function CompanyRegisterPage() {
                   {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
                 </div>
 
-                <div>
-                  <Label htmlFor="position">役職 *</Label>
-                  <Input
-                    id="position"
-                    value={formData.position}
-                    onChange={(e) => updateFormData("position", e.target.value)}
-                    placeholder="例: 人事部長、採用担当者"
-                    className={errors.position ? "border-red-500" : ""}
-                  />
-                  {errors.position && <p className="text-red-500 text-sm mt-1">{errors.position}</p>}
-                </div>
 
                 <div>
                   <Label htmlFor="phone">電話番号</Label>
@@ -440,18 +466,6 @@ export default function CompanyRegisterPage() {
             {/* ステップ2: 法人情報 */}
             {step === 2 && (
               <>
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="flex items-start">
-                    <AlertCircle className="h-5 w-5 text-blue-600 mt-0.5 mr-2" />
-                    <div>
-                      <h4 className="font-medium text-blue-900">法人確認について</h4>
-                      <p className="text-sm text-blue-700 mt-1">
-                        入力いただいた情報は法人確認のため、登記簿謄本等と照合させていただきます。
-                        正確な情報をご入力ください。
-                      </p>
-                    </div>
-                  </div>
-                </div>
 
                 <div>
                   <Label htmlFor="companyName">会社名 *</Label>
@@ -463,69 +477,6 @@ export default function CompanyRegisterPage() {
                     className={errors.companyName ? "border-red-500" : ""}
                   />
                   {errors.companyName && <p className="text-red-500 text-sm mt-1">{errors.companyName}</p>}
-                </div>
-
-                <div>
-                  <Label htmlFor="companyNameKana">会社名（カナ） *</Label>
-                  <Input
-                    id="companyNameKana"
-                    value={formData.companyNameKana}
-                    onChange={(e) => updateFormData("companyNameKana", e.target.value)}
-                    placeholder="例: カブシキガイシャキャリプラ"
-                    className={errors.companyNameKana ? "border-red-500" : ""}
-                  />
-                  {errors.companyNameKana && <p className="text-red-500 text-sm mt-1">{errors.companyNameKana}</p>}
-                </div>
-
-                <div>
-                  <Label htmlFor="registrationNumber">法人番号 *</Label>
-                  <Input
-                    id="registrationNumber"
-                    value={formData.registrationNumber}
-                    onChange={(e) => updateFormData("registrationNumber", e.target.value)}
-                    placeholder="例: 1234567890123"
-                    className={errors.registrationNumber ? "border-red-500" : ""}
-                  />
-                  {errors.registrationNumber && (
-                    <p className="text-red-500 text-sm mt-1">{errors.registrationNumber}</p>
-                  )}
-                  <p className="text-sm text-gray-500 mt-1">13桁の法人番号を入力してください</p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="establishedYear">設立年 *</Label>
-                    <Input
-                      id="establishedYear"
-                      type="number"
-                      value={formData.establishedYear}
-                      onChange={(e) => updateFormData("establishedYear", e.target.value)}
-                      placeholder="例: 2020"
-                      min="1900"
-                      max={new Date().getFullYear()}
-                      className={errors.establishedYear ? "border-red-500" : ""}
-                    />
-                    {errors.establishedYear && <p className="text-red-500 text-sm mt-1">{errors.establishedYear}</p>}
-                  </div>
-                  <div>
-                    <Label htmlFor="employeeCount">従業員数 *</Label>
-                    <Select
-                      value={formData.employeeCount}
-                      onValueChange={(value) => updateFormData("employeeCount", value)}
-                    >
-                      <SelectTrigger className={errors.employeeCount ? "border-red-500" : ""}>
-                        <SelectValue placeholder="選択してください" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {employeeCounts.map((count) => (
-                          <SelectItem key={count} value={count}>
-                            {count}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {errors.employeeCount && <p className="text-red-500 text-sm mt-1">{errors.employeeCount}</p>}
-                  </div>
                 </div>
 
                 <div>
@@ -574,17 +525,6 @@ export default function CompanyRegisterPage() {
             {/* ステップ3: 住所情報 */}
             {step === 3 && (
               <>
-                <div className="bg-amber-50 p-4 rounded-lg">
-                  <div className="flex items-start">
-                    <AlertCircle className="h-5 w-5 text-amber-600 mt-0.5 mr-2" />
-                    <div>
-                      <h4 className="font-medium text-amber-900">登記住所の入力</h4>
-                      <p className="text-sm text-amber-700 mt-1">
-                        法人確認のため、登記簿謄本に記載されている住所と同じ住所を入力してください。
-                      </p>
-                    </div>
-                  </div>
-                </div>
 
                 <div>
                   <Label htmlFor="postalCode">郵便番号 *</Label>
@@ -734,24 +674,16 @@ export default function CompanyRegisterPage() {
                     </div>
                   </div>
                 </div>
-
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="flex items-start">
-                    <CheckCircle className="h-5 w-5 text-green-600 mt-0.5 mr-2" />
-                    <div>
-                      <h4 className="font-medium text-green-900">登録後の流れ</h4>
-                      <ul className="text-sm text-green-700 mt-1 space-y-1">
-                        <li>• 法人確認（1-3営業日）</li>
-                        <li>• 管理者による承認</li>
-                        <li>• アカウント有効化のお知らせ</li>
-                        <li>• セットアップガイドの開始</li>
-                      </ul>
-                    </div>
-                  </div>
-                </div>
               </>
             )}
 
+            {/* サブミットエラー表示 */}
+            {errors.submit && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{errors.submit}</AlertDescription>
+              </Alert>
+            )}
             {/* ナビゲーションボタン */}
             <div className="flex justify-between pt-6">
               <Button

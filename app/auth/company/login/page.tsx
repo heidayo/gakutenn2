@@ -13,6 +13,9 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
+// ─── Supabase client ────────────────────────────────
+import { supabase } from "@/lib/supabase/client"
+
 export default function CompanyLoginPage() {
   const { toast } = useToast()
   const [email, setEmail] = useState("")
@@ -48,25 +51,28 @@ export default function CompanyLoginPage() {
         // 管理ダッシュボードへリダイレクト
         window.location.href = "/admin/dashboard"
       } else {
-        // 通常の企業ログイン
-        await new Promise((resolve, reject) =>
-          setTimeout(() => {
-            if (email !== "company@example.com" || password !== "password123") {
-              reject(new Error("メールアドレスまたはパスワードが正しくありません。"))
-            } else {
-              resolve(true)
-            }
-          }, 1500),
-        )
+        // ───────── 通常の企業ログイン（Supabase連携） ─────────
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email,
+            password,
+          })
 
-        toast({
-          title: "ログイン成功！",
-          description: "企業ダッシュボードへ移動します。",
-          variant: "default",
-        })
+          if (error) {
+            throw new Error(error.message)
+          }
 
-        // 企業ダッシュボードへリダイレクト
-        window.location.href = "/company/dashboard"
+          toast({
+            title: "ログイン成功！",
+            description: "企業ダッシュボードへ移動します。",
+            variant: "default",
+          })
+
+          // 企業ダッシュボードへリダイレクト
+          window.location.href = "/company/dashboard"
+        } catch (signInErr: any) {
+          throw new Error(signInErr.message || "メールアドレスまたはパスワードが正しくありません。")
+        }
       }
     } catch (err: any) {
       toast({
@@ -81,25 +87,28 @@ export default function CompanyLoginPage() {
 
   const handleGoogleLogin = async () => {
     setSocialLoading("Google")
-
     try {
-      // 仮のGoogleログインロジック
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      toast({
-        title: "Googleログイン成功！",
-        description: "企業ダッシュボードへ移動します。",
-        variant: "default",
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${location.origin}/company/dashboard`,
+        },
       })
 
-      window.location.href = "/company/dashboard"
-    } catch (err) {
+      if (error) {
+        throw new Error(error.message)
+      }
+
+      // If Supabase returns a redirect URL in the same tab, navigate manually
+      if (data?.url) {
+        window.location.href = data.url
+      }
+    } catch (err: any) {
       toast({
         title: "Googleログインに失敗しました",
-        description: "エラーが発生しました。もう一度お試しください。",
+        description: err.message || "エラーが発生しました。もう一度お試しください。",
         variant: "destructive",
       })
-    } finally {
       setSocialLoading(null)
     }
   }

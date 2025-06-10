@@ -22,6 +22,7 @@ export type Database = {
           phone: string | null
           size: string | null
           updated_at: string | null
+          user_id: string | null
           website: string | null
         }
         Insert: {
@@ -36,6 +37,7 @@ export type Database = {
           phone?: string | null
           size?: string | null
           updated_at?: string | null
+          user_id?: string | null
           website?: string | null
         }
         Update: {
@@ -50,6 +52,7 @@ export type Database = {
           phone?: string | null
           size?: string | null
           updated_at?: string | null
+          user_id?: string | null
           website?: string | null
         }
         Relationships: []
@@ -445,7 +448,11 @@ export type Database = {
           avatar_url: string | null
           created_at: string | null
           email: string
+          faculty: string | null
+          first_name: string | null
+          full_name: string | null
           id: string
+          last_name: string | null
           location: string | null
           major: string
           name: string
@@ -453,13 +460,18 @@ export type Database = {
           status: string | null
           university: string
           updated_at: string | null
+          user_id: string | null
           year: number
         }
         Insert: {
           avatar_url?: string | null
           created_at?: string | null
           email: string
+          faculty?: string | null
+          first_name?: string | null
+          full_name?: string | null
           id?: string
+          last_name?: string | null
           location?: string | null
           major: string
           name: string
@@ -467,13 +479,18 @@ export type Database = {
           status?: string | null
           university: string
           updated_at?: string | null
+          user_id?: string | null
           year: number
         }
         Update: {
           avatar_url?: string | null
           created_at?: string | null
           email?: string
+          faculty?: string | null
+          first_name?: string | null
+          full_name?: string | null
           id?: string
+          last_name?: string | null
           location?: string | null
           major?: string
           name?: string
@@ -481,6 +498,7 @@ export type Database = {
           status?: string | null
           university?: string
           updated_at?: string | null
+          user_id?: string | null
           year?: number
         }
         Relationships: []

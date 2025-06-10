@@ -26,6 +26,11 @@ const items = [
 export default function FooterNav() {
   const pathname = usePathname();
 
+  // ─── Render only on student pages ────────────────
+  if (!pathname.startsWith("/student")) {
+    return null;
+  }
+
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white">
       <ul className="grid grid-cols-5">
