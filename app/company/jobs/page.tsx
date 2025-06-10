@@ -97,118 +97,139 @@ export default function JobsPage() {
     views: { current: 0, previous: 0, change: 0 },
   })
 
+  // --- Load jobs and stats from Supabase ---
+  const loadJobs = async () => {
+    const sb = supabase as any
+    // ------ jobs with aggregated counts ------
+    const { data: jobRows } = await sb
+      .from("jobs")
+      .select(
+        `
+        id,
+        title,
+        category,
+        status,
+        created_at,
+        published_at,
+        expires_at,
+        location,
+        salary_text,
+        work_type,
+        tags,
+        is_urgent,
+        applications_count,
+        views_count,
+        interviews_count,
+        hires_count
+      `
+      )
+
+    setJobs(
+      (jobRows ?? []).map((row: any) => ({
+        id: row.id,
+        title: row.title,
+        category: row.category ?? "その他",
+        status: row.status,
+        statusLabel:
+          row.status === "published"
+            ? "公開中"
+            : row.status === "draft"
+            ? "下書き"
+            : row.status === "paused"
+            ? "一時停止"
+            : "期限切れ",
+        statusColor:
+          row.status === "published"
+            ? "bg-green-100 text-green-800"
+            : row.status === "draft"
+            ? "bg-gray-100 text-gray-800"
+            : row.status === "paused"
+            ? "bg-yellow-100 text-yellow-800"
+            : "bg-red-100 text-red-800",
+        createdDate: new Date(row.created_at).toLocaleDateString("ja-JP"),
+        publishedDate: row.published_at ? new Date(row.published_at).toLocaleDateString("ja-JP") : "",
+        expiryDate: row.expires_at ? new Date(row.expires_at).toLocaleDateString("ja-JP") : "",
+        location: row.location ?? "未設定",
+        salary: row.salary_text ?? "-",
+        workType: row.work_type ?? "-",
+        applications: row.applications_count ?? 0,
+        views: row.views_count ?? 0,
+        interviews: row.interviews_count ?? 0,
+        hires: row.hires_count ?? 0,
+        conversionRate:
+          row.views_count && row.views_count > 0
+            ? Math.round((row.hires_count / row.views_count) * 1000) / 10
+            : 0,
+        tags: row.tags ?? [],
+        isUrgent: row.is_urgent,
+      }))
+    )
+
+    // ------ aggregate stats ------
+    const [
+      { count: totalJobs },
+      { count: activeJobs },
+      { count: totalApplications },
+      { count: totalInterviews },
+      { count: totalHires },
+    ] = await Promise.all([
+      sb.from("jobs").select("id", { count: "exact", head: true }),
+      sb.from("jobs").select("id", { count: "exact", head: true }).eq("status", "published"),
+      sb.from("applications").select("id", { count: "exact", head: true }),
+      sb.from("interviews").select("id", { count: "exact", head: true }),
+      sb.from("applications").select("id", { count: "exact", head: true }).eq("status", "合格"),
+    ])
+
+    const avgApps =
+      totalJobs && totalJobs > 0 ? Math.round(((totalApplications ?? 0) / totalJobs) * 10) / 10 : 0
+    const convRate =
+      totalApplications && totalApplications > 0
+        ? Math.round(((totalHires ?? 0) / totalApplications) * 1000) / 10
+        : 0
+
+    setStats({
+      totalJobs: totalJobs ?? 0,
+      activeJobs: activeJobs ?? 0,
+      totalApplications: totalApplications ?? 0,
+      totalInterviews: totalInterviews ?? 0,
+      totalHires: totalHires ?? 0,
+      averageApplications: avgApps,
+      conversionRate: convRate,
+      responseRate: 0, // TODO: calculate via RPC if available
+    })
+
+    // ------ period stats (placeholder zero) ------
+    setPeriodStats({
+      applications: { current: 0, previous: 0, change: 0 },
+      interviews: { current: 0, previous: 0, change: 0 },
+      hires: { current: 0, previous: 0, change: 0 },
+      views: { current: 0, previous: 0, change: 0 },
+    })
+  }
+
   useEffect(() => {
     const sb = supabase as any
 
-    const loadJobs = async () => {
-      // ------ jobs with aggregated counts ------
-      const { data: jobRows } = await sb
-        .from("jobs")
-        .select(
-          `
-          id,
-          title,
-          category,
-          status,
-          created_at,
-          published_at,
-          expires_at,
-          location,
-          salary_text,
-          work_type,
-          tags,
-          is_urgent,
-          applications_count,
-          views_count,
-          interviews_count,
-          hires_count
-        `
-        )
-
-      setJobs(
-        (jobRows ?? []).map((row: any) => ({
-          id: row.id,
-          title: row.title,
-          category: row.category ?? "その他",
-          status: row.status,
-          statusLabel:
-            row.status === "published"
-              ? "公開中"
-              : row.status === "draft"
-              ? "下書き"
-              : row.status === "paused"
-              ? "一時停止"
-              : "期限切れ",
-          statusColor:
-            row.status === "published"
-              ? "bg-green-100 text-green-800"
-              : row.status === "draft"
-              ? "bg-gray-100 text-gray-800"
-              : row.status === "paused"
-              ? "bg-yellow-100 text-yellow-800"
-              : "bg-red-100 text-red-800",
-          createdDate: new Date(row.created_at).toLocaleDateString("ja-JP"),
-          publishedDate: row.published_at ? new Date(row.published_at).toLocaleDateString("ja-JP") : "",
-          expiryDate: row.expires_at ? new Date(row.expires_at).toLocaleDateString("ja-JP") : "",
-          location: row.location ?? "未設定",
-          salary: row.salary_text ?? "-",
-          workType: row.work_type ?? "-",
-          applications: row.applications_count ?? 0,
-          views: row.views_count ?? 0,
-          interviews: row.interviews_count ?? 0,
-          hires: row.hires_count ?? 0,
-          conversionRate:
-            row.views_count && row.views_count > 0
-              ? Math.round((row.hires_count / row.views_count) * 1000) / 10
-              : 0,
-          tags: row.tags ?? [],
-          isUrgent: row.is_urgent,
-        }))
-      )
-
-      // ------ aggregate stats ------
-      const [
-        { count: totalJobs },
-        { count: activeJobs },
-        { count: totalApplications },
-        { count: totalInterviews },
-        { count: totalHires },
-      ] = await Promise.all([
-        sb.from("jobs").select("id", { count: "exact", head: true }),
-        sb.from("jobs").select("id", { count: "exact", head: true }).eq("status", "published"),
-        sb.from("applications").select("id", { count: "exact", head: true }),
-        sb.from("interviews").select("id", { count: "exact", head: true }),
-        sb.from("applications").select("id", { count: "exact", head: true }).eq("status", "合格"),
-      ])
-
-      const avgApps =
-        totalJobs && totalJobs > 0 ? Math.round(((totalApplications ?? 0) / totalJobs) * 10) / 10 : 0
-      const convRate =
-        totalApplications && totalApplications > 0
-          ? Math.round(((totalHires ?? 0) / totalApplications) * 1000) / 10
-          : 0
-
-      setStats({
-        totalJobs: totalJobs ?? 0,
-        activeJobs: activeJobs ?? 0,
-        totalApplications: totalApplications ?? 0,
-        totalInterviews: totalInterviews ?? 0,
-        totalHires: totalHires ?? 0,
-        averageApplications: avgApps,
-        conversionRate: convRate,
-        responseRate: 0, // TODO: calculate via RPC if available
-      })
-
-      // ------ period stats (placeholder zero) ------
-      setPeriodStats({
-        applications: { current: 0, previous: 0, change: 0 },
-        interviews: { current: 0, previous: 0, change: 0 },
-        hires: { current: 0, previous: 0, change: 0 },
-        views: { current: 0, previous: 0, change: 0 },
-      })
-    }
-
+    // --- 初回読み込み ---
     loadJobs()
+
+    // --- Realtime subscription ---
+    const jobsChannel = sb
+      .channel("company_jobs_realtime")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "jobs" },
+        () => {
+          // 追加・更新・削除があったら一覧を再取得
+          loadJobs()
+        }
+      )
+      .subscribe()
+
+    // --- クリーンアップ ---
+    return () => {
+      sb.removeChannel(jobsChannel)
+    }
   }, [])
 
   const handleSelectJob = (jobId: number) => {

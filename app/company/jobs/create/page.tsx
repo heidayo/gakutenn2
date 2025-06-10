@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   ArrowLeft,
@@ -24,9 +24,55 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
+import { supabase } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
+
+// ─── 型定義 ──────────────────────────────────────────────
+interface FormData {
+  // 基本情報
+  title: string;
+  category: string;
+  description: string;
+  responsibilities: string[];
+  requirements: string[];
+
+  // 勤務条件
+  location: string;
+  salary: string;
+  salaryType: string;
+  workDays: string[];
+  workHours: string;
+  duration: string;
+  startDate: string;
+
+  // 働き方
+  remote: boolean;
+  remoteDetails: string;
+  frequency: string;
+
+  // 待遇・福利厚生
+  benefits: string[];
+
+  // 選考フロー
+  selectionSteps: { title: string; duration: string; description: string }[];
+
+  // 企業・メンター情報
+  mentorName: string;
+  mentorRole: string;
+  mentorExperience: string;
+  mentorMessage: string;
+
+  // 公開設定
+  status: string;
+  publishDate: string;
+  tags: string[];
+}
+
+// 配列操作を許可するキーのみ
+type ArrayField = "responsibilities" | "requirements" | "benefits";
 
 export default function CreateJobPage() {
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<FormData>({
     // 基本情報
     title: "",
     category: "",
@@ -38,7 +84,7 @@ export default function CreateJobPage() {
     location: "",
     salary: "",
     salaryType: "hourly",
-    workDays: [],
+    workDays: [] as string[],
     workHours: "",
     duration: "",
     startDate: "",
@@ -66,11 +112,15 @@ export default function CreateJobPage() {
     // 公開設定
     status: "draft",
     publishDate: "",
-    tags: [],
+    tags: [] as string[],
   })
 
   const [currentTab, setCurrentTab] = useState("basic")
-  const [errors, setErrors] = useState({})
+  // 入力バリデーション用エラー
+  type FieldErrorMap = Partial<Record<keyof FormData, string>>;
+  const [errors, setErrors] = useState<FieldErrorMap>({})
+
+  const router = useRouter();
 
   const categories = [
     "マーケティング",
@@ -108,26 +158,43 @@ export default function CreateJobPage() {
     "短期OK",
   ]
 
-  const handleArrayFieldAdd = (field: string) => {
+  const handleArrayFieldAdd = (field: ArrayField) => {
     setFormData((prev) => ({
       ...prev,
       [field]: [...prev[field], ""],
     }))
   }
 
-  const handleArrayFieldRemove = (field: string, index: number) => {
+  const handleArrayFieldRemove = (field: ArrayField, index: number) => {
     setFormData((prev) => ({
       ...prev,
       [field]: prev[field].filter((_, i) => i !== index),
     }))
   }
 
-  const handleArrayFieldChange = (field: string, index: number, value: string) => {
+  const handleArrayFieldChange = (field: ArrayField, index: number, value: string) => {
     setFormData((prev) => ({
       ...prev,
       [field]: prev[field].map((item, i) => (i === index ? value : item)),
     }))
   }
+
+  // ─── 選考ステップ専用 ───────────────────────────────
+  const defaultStep = { title: "", duration: "", description: "" };
+
+  const handleSelectionStepAdd = () => {
+    setFormData((prev) => ({
+      ...prev,
+      selectionSteps: [...prev.selectionSteps, { ...defaultStep }],
+    }));
+  };
+
+  const handleSelectionStepRemove = (index: number) => {
+    setFormData((prev) => ({
+      ...prev,
+      selectionSteps: prev.selectionSteps.filter((_, i) => i !== index),
+    }));
+  };
 
   const handleWorkDayChange = (dayId: string, checked: boolean) => {
     if (checked) {
@@ -159,27 +226,124 @@ export default function CreateJobPage() {
     }))
   }
 
-  const handleSave = (status: string) => {
-    // バリデーション
-    const newErrors = {}
-    if (!formData.title) newErrors.title = "職種名は必須です"
-    if (!formData.category) newErrors.category = "カテゴリは必須です"
-    if (!formData.description) newErrors.description = "業務内容は必須です"
+  const handleSave = async (status: string) => {
+    // ─── バリデーション ──────────────────────────────
+    const newErrors: FieldErrorMap = {};
+    if (!formData.title) newErrors.title = "職種名は必須です";
+    if (!formData.category) newErrors.category = "カテゴリは必須です";
+    if (!formData.description) newErrors.description = "業務内容は必須です";
 
     if (Object.keys(newErrors).length > 0) {
-      setErrors(newErrors)
-      return
+      setErrors(newErrors);
+      return;
     }
 
-    // 保存処理
-    console.log("Saving job:", { ...formData, status })
+    // ─── ログインセッション取得 ────────────────────────────
+    const {
+      data: { session },
+      error: sessionErr,
+    } = await supabase.auth.getSession();
 
-    if (status === "published") {
-      alert("求人を公開しました！")
+    if (sessionErr || !session) {
+      alert("ログイン情報を取得できませんでした。再度ログインしてください。");
+      return;
+    }
+
+    // --- 企業ID を解決 ---------------------------------------------
+    let companyId: string | null = null;
+
+    // ① company_members から取得（推奨パス）
+    const { data: memberRow, error: memberErr } = await supabase
+      .from("company_members")
+      .select("company_id")
+      .eq("user_id", session.user.id)
+      .maybeSingle();
+
+    if (memberRow?.company_id) {
+      companyId = memberRow.company_id;
     } else {
-      alert("下書きを保存しました！")
+      // ② fallback: companies.email が Auth の email と一致する行を探す
+      let companyRow: { id: string } | null = null;
+      let companyErr: any = null;
+
+      if (session.user.email) {
+        const { data, error } = await supabase
+          .from("companies")
+          .select("id")
+          .eq("email", session.user.email)
+          .maybeSingle<{ id: string }>();
+
+        companyRow = data;
+        companyErr = error;
+      }
+
+      if (companyRow?.id) {
+        companyId = companyRow.id;
+      } else {
+        console.error("企業メンバー取得エラー:", memberErr ?? companyErr);
+        alert(
+          "企業情報を取得できませんでした。\n企業へ参加済みか、企業登録のメールアドレスが一致しているかをご確認ください。"
+        );
+        return;
+      }
     }
-  }
+
+    // ─── 送信用データ整形 ─────────────────────────────
+    const payload = {
+      // ---- 必須 ----
+      company_id: companyId,
+      status,
+      title: formData.title,
+      category: formData.category,
+      description: formData.description,
+
+      // ---- 配列／詳細 ----
+      responsibilities: formData.responsibilities.filter((v) => v.trim() !== ""),
+      requirements: formData.requirements.filter((v) => v.trim() !== ""),
+      benefits: formData.benefits.filter((v) => v.trim() !== ""),
+      tags: formData.tags,
+
+      // ---- 勤務条件 ----
+      location: formData.location,
+      salary: formData.salary ? Number(formData.salary) : null,
+      salary_type: formData.salaryType,
+      work_days: formData.workDays,
+      work_hours: formData.workHours,
+      duration: formData.duration,
+      start_date: formData.startDate || null,
+      frequency: formData.frequency,
+
+      // ---- 働き方 ----
+      remote: formData.remote,
+      remote_details: formData.remoteDetails,
+
+      // ---- 選考フロー & メンター ----
+      selection_steps: formData.selectionSteps,
+      mentor_name: formData.mentorName,
+      mentor_role: formData.mentorRole,
+      mentor_experience: formData.mentorExperience,
+      mentor_message: formData.mentorMessage,
+
+      // ---- 公開設定 & メタ ----
+      publish_date: formData.publishDate
+        ? new Date(formData.publishDate).toISOString()
+        : null,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    // ─── Supabase へ保存 ────────────────────────────
+    const { error } = await supabase.from("jobs").insert(payload);
+
+    if (error) {
+      console.error("Error saving job:", error);
+      alert("求人の保存中にエラーが発生しました。");
+      return;
+    }
+
+    alert(status === "published" ? "求人を公開しました！" : "下書きを保存しました！");
+    router.push("/company/jobs"); // 一覧へリダイレクト
+  };
 
   const handlePreview = () => {
     // プレビュー画面を開く
@@ -279,17 +443,26 @@ export default function CreateJobPage() {
                       <Label>カテゴリ *</Label>
                       <Select
                         value={formData.category}
-                        onValueChange={(value) => setFormData((prev) => ({ ...prev, category: value }))}
+                        onValueChange={(value) =>
+                          setFormData((prev) => ({ ...prev, category: value }))
+                        }
                       >
                         <SelectTrigger className={errors.category ? "border-red-500" : ""}>
                           <SelectValue placeholder="カテゴリを選択" />
                         </SelectTrigger>
-                        <SelectContent>
-                          {categories.map((category) => (
-                            <SelectItem key={category} value={category}>
-                              {category}
-                            </SelectItem>
-                          ))}
+
+                        {/* ポップアップがルート外に描画され、overflow hidden の親でも表示できるように */}
+                        <SelectContent
+                          position="popper"
+                          className="z-[60] bg-white border shadow-lg"
+                        >
+                          <SelectGroup>
+                            {categories.map((c) => (
+                              <SelectItem key={c} value={c}>
+                                {c}
+                              </SelectItem>
+                            ))}
+                          </SelectGroup>
                         </SelectContent>
                       </Select>
                       {errors.category && <p className="text-sm text-red-500">{errors.category}</p>}
@@ -409,7 +582,7 @@ export default function CreateJobPage() {
                           <SelectTrigger className="w-32">
                             <SelectValue />
                           </SelectTrigger>
-                          <SelectContent>
+                          <SelectContent className="z-[9999] bg-white border shadow-lg">
                             <SelectItem value="hourly">時給</SelectItem>
                             <SelectItem value="daily">日給</SelectItem>
                             <SelectItem value="monthly">月給</SelectItem>
@@ -435,41 +608,43 @@ export default function CreateJobPage() {
                     </div>
                   </div>
 
-                  <div className="space-y-3">
-                    <Label>勤務可能曜日</Label>
-                    <div className="grid grid-cols-4 gap-3">
-                      {workDayOptions.map((day) => (
-                        <div key={day.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={day.id}
-                            checked={formData.workDays.includes(day.id)}
-                            onCheckedChange={(checked) => handleWorkDayChange(day.id, checked)}
-                          />
-                          <Label htmlFor={day.id} className="text-sm">
-                            {day.label}
-                          </Label>
-                        </div>
-                      ))}
+                    <div className="space-y-3">
+                      <Label>勤務可能曜日</Label>
+                      <div className="grid grid-cols-4 gap-3">
+                        {workDayOptions.map((day) => (
+                          <div key={day.id} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={day.id}
+                              checked={formData.workDays.includes(day.id)}
+                              onCheckedChange={(checked) => handleWorkDayChange(day.id, checked === true)}
+                            />
+                            <Label htmlFor={day.id} className="text-sm">
+                              {day.label}
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="space-y-3">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="remote"
-                        checked={formData.remote}
-                        onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, remote: checked }))}
-                      />
-                      <Label htmlFor="remote">リモートワーク可能</Label>
+                    <div className="space-y-3">
+                      <div className="flex items-center space-x-2">
+                        <Checkbox
+                          id="remote"
+                          checked={formData.remote}
+                          onCheckedChange={(checked) =>
+                            setFormData((prev) => ({ ...prev, remote: checked === true }))
+                          }
+                        />
+                        <Label htmlFor="remote">リモートワーク可能</Label>
+                      </div>
+                      {formData.remote && (
+                        <Input
+                          value={formData.remoteDetails}
+                          onChange={(e) => setFormData((prev) => ({ ...prev, remoteDetails: e.target.value }))}
+                          placeholder="例: 週1回出社必須、完全リモート可"
+                        />
+                      )}
                     </div>
-                    {formData.remote && (
-                      <Input
-                        value={formData.remoteDetails}
-                        onChange={(e) => setFormData((prev) => ({ ...prev, remoteDetails: e.target.value }))}
-                        placeholder="例: 週1回出社必須、完全リモート可"
-                      />
-                    )}
-                  </div>
 
                   <div className="space-y-4">
                     <Label>待遇・福利厚生</Label>
@@ -512,7 +687,7 @@ export default function CreateJobPage() {
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => handleArrayFieldRemove("selectionSteps", index)}
+                            onClick={() => handleSelectionStepRemove(index)}
                           >
                             <X className="h-4 w-4" />
                           </Button>
@@ -559,7 +734,7 @@ export default function CreateJobPage() {
                       </div>
                     </div>
                   ))}
-                  <Button variant="outline" onClick={() => handleArrayFieldAdd("selectionSteps")}>
+                  <Button variant="outline" onClick={handleSelectionStepAdd}>
                     <Plus className="h-4 w-4 mr-2" />
                     選考ステップを追加
                   </Button>

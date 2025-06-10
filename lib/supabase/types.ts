@@ -22,7 +22,6 @@ export type Database = {
           phone: string | null
           size: string | null
           updated_at: string | null
-          user_id: string | null
           website: string | null
         }
         Insert: {
@@ -37,7 +36,6 @@ export type Database = {
           phone?: string | null
           size?: string | null
           updated_at?: string | null
-          user_id?: string | null
           website?: string | null
         }
         Update: {
@@ -52,10 +50,41 @@ export type Database = {
           phone?: string | null
           size?: string | null
           updated_at?: string | null
-          user_id?: string | null
           website?: string | null
         }
         Relationships: []
+      }
+      company_members: {
+        Row: {
+          company_id: string | null
+          created_at: string | null
+          id: string
+          role: string | null
+          user_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          role?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string | null
+          id?: string
+          role?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "company_members_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       feedback_templates: {
         Row: {
@@ -244,6 +273,110 @@ export type Database = {
             columns: ["student_id"]
             isOneToOne: false
             referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      jobs: {
+        Row: {
+          benefits: string[] | null
+          category: string
+          company_id: string
+          created_at: string | null
+          description: string
+          duration: string | null
+          frequency: string | null
+          id: string
+          location: string | null
+          mentor_experience: string | null
+          mentor_message: string | null
+          mentor_name: string | null
+          mentor_role: string | null
+          publish_date: string | null
+          remote: boolean | null
+          remote_details: string | null
+          requirements: string[] | null
+          responsibilities: string[] | null
+          salary: number | null
+          salary_type: string | null
+          search_vector: unknown | null
+          selection_steps: Json | null
+          start_date: string | null
+          status: string | null
+          tags: string[] | null
+          title: string
+          updated_at: string | null
+          work_days: string[] | null
+          work_hours: string | null
+        }
+        Insert: {
+          benefits?: string[] | null
+          category: string
+          company_id: string
+          created_at?: string | null
+          description: string
+          duration?: string | null
+          frequency?: string | null
+          id?: string
+          location?: string | null
+          mentor_experience?: string | null
+          mentor_message?: string | null
+          mentor_name?: string | null
+          mentor_role?: string | null
+          publish_date?: string | null
+          remote?: boolean | null
+          remote_details?: string | null
+          requirements?: string[] | null
+          responsibilities?: string[] | null
+          salary?: number | null
+          salary_type?: string | null
+          search_vector?: unknown | null
+          selection_steps?: Json | null
+          start_date?: string | null
+          status?: string | null
+          tags?: string[] | null
+          title: string
+          updated_at?: string | null
+          work_days?: string[] | null
+          work_hours?: string | null
+        }
+        Update: {
+          benefits?: string[] | null
+          category?: string
+          company_id?: string
+          created_at?: string | null
+          description?: string
+          duration?: string | null
+          frequency?: string | null
+          id?: string
+          location?: string | null
+          mentor_experience?: string | null
+          mentor_message?: string | null
+          mentor_name?: string | null
+          mentor_role?: string | null
+          publish_date?: string | null
+          remote?: boolean | null
+          remote_details?: string | null
+          requirements?: string[] | null
+          responsibilities?: string[] | null
+          salary?: number | null
+          salary_type?: string | null
+          search_vector?: unknown | null
+          selection_steps?: Json | null
+          start_date?: string | null
+          status?: string | null
+          tags?: string[] | null
+          title?: string
+          updated_at?: string | null
+          work_days?: string[] | null
+          work_hours?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "jobs_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
             referencedColumns: ["id"]
           },
         ]
