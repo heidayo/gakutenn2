@@ -29,6 +29,7 @@ import {
   RefreshCw,
 } from "lucide-react"
 import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase/client"
 import Link from "next/link"
 
 export default function CompanyInterviewsPage() {
@@ -42,67 +43,78 @@ export default function CompanyInterviewsPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(new Date())
 
-  // 面談データ
-  const [interviews, setInterviews] = useState([
-    {
-      id: 1,
-      applicant: "田中 太郎",
-      applicantId: 1,
-      job: "Webマーケティングアシスタント",
-      date: "2024年6月5日",
-      time: "14:00-15:00",
-      type: "オンライン",
-      status: "予定",
-      interviewer: "佐藤マネージャー",
-      meetingLink: "https://meet.example.com/abc123",
-      notes: "履歴書を事前に確認済み",
-      reminders: ["1日前", "1時間前"],
-      priority: "高",
-    },
-    {
-      id: 2,
-      applicant: "佐藤 花子",
-      applicantId: 2,
-      job: "SNS運用サポート",
-      date: "2024年6月6日",
-      time: "16:00-17:00",
-      type: "対面",
-      status: "確定",
-      interviewer: "田中部長",
-      location: "東京オフィス 会議室A",
-      notes: "ポートフォリオ持参予定",
-      reminders: ["1日前"],
-      priority: "中",
-    },
-    {
-      id: 3,
-      applicant: "山田 次郎",
-      applicantId: 3,
-      job: "データ分析補助",
-      date: "2024年6月4日",
-      time: "10:00-11:00",
-      type: "オンライン",
-      status: "完了",
-      interviewer: "鈴木リーダー",
-      meetingLink: "https://meet.example.com/def456",
-      notes: "技術的な質問を中心に実施",
-      evaluation: "A",
-      priority: "高",
-    },
-    {
-      id: 4,
-      applicant: "鈴木 美咲",
-      applicantId: 4,
-      job: "カスタマーサポート",
-      date: "2024年6月7日",
-      time: "13:00-14:00",
-      type: "電話",
-      status: "キャンセル",
-      interviewer: "高橋マネージャー",
-      notes: "学生都合によりキャンセル",
-      priority: "低",
-    },
-  ])
+  // 面談データ (Supabase から取得)
+  interface Interview {
+    id: number
+    applicant: string
+    applicantId: number
+    job: string
+    date: string
+    time: string
+    type: string
+    status: string
+    interviewer: string
+    meetingLink?: string
+    location?: string
+    notes?: string
+    evaluation?: string
+    priority: string
+  }
+
+  const [interviews, setInterviews] = useState<Interview[]>([])
+
+  // データ取得
+  useEffect(() => {
+    const fetchInterviews = async () => {
+      const sb = supabase as any
+      const { data, error } = await sb
+        .from("interviews") // ← テーブル名を実際に合わせて修正
+        .select(`
+          id,
+          date,
+          start_time,
+          end_time,
+          type,
+          status,
+          interviewer,
+          meeting_link,
+          location,
+          notes,
+          evaluation,
+          priority,
+          applicant_id,
+          profiles!inner(id, full_name),
+          jobs(title)
+        `)
+        .order("date")
+
+      if (error) {
+        console.error("interviews fetch error", error)
+        return
+      }
+
+      setInterviews(
+        (data ?? []).map((row: any) => ({
+          id: row.id,
+          applicant: row.profiles.full_name,
+          applicantId: row.applicant_id,
+          job: row.jobs.title,
+          date: new Date(row.date).toLocaleDateString("ja-JP"),
+          time: row.start_time && row.end_time ? `${row.start_time}-${row.end_time}` : "",
+          type: row.type,
+          status: row.status,
+          interviewer: row.interviewer ?? "-",
+          meetingLink: row.meeting_link ?? undefined,
+          location: row.location ?? undefined,
+          notes: row.notes ?? undefined,
+          evaluation: row.evaluation ?? undefined,
+          priority: row.priority ?? "中",
+        }))
+      )
+    }
+
+    fetchInterviews()
+  }, [])
 
   // 面談枠設定
   const [timeSlots, setTimeSlots] = useState([
@@ -140,7 +152,7 @@ export default function CompanyInterviewsPage() {
     scheduled: interviews.filter((i) => i.status === "予定" || i.status === "確定").length,
     completed: interviews.filter((i) => i.status === "完了").length,
     cancelled: interviews.filter((i) => i.status === "キャンセル").length,
-    today: interviews.filter((i) => i.date === "2024年6月5日").length,
+    today: interviews.filter((i) => i.date === new Date().toLocaleDateString("ja-JP")).length,
   }
 
   // 自動更新
@@ -513,7 +525,7 @@ export default function CompanyInterviewsPage() {
                           <div key={interview.id} className="p-3 border rounded-lg">
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-semibold text-sm">{interview.applicant}</h4>
-                              <Badge className={getStatusColor(interview.status)} size="sm">
+                              <Badge className={`${getStatusColor(interview.status)} text-xs`}>
                                 {interview.status}
                               </Badge>
                             </div>

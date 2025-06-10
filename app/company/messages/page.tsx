@@ -23,138 +23,162 @@ import {
   Video,
 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase/client"
 
 export default function CompanyMessagesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [selectedChat, setSelectedChat] = useState<number | null>(1)
 
-  // メッセージ統計
-  const messageStats = {
-    total: 45,
-    unread: 8,
-    urgent: 3,
-    archived: 12,
-    averageResponseTime: "2.3時間",
-    responseRate: 94,
+  // ---------- Supabase‑backed state ----------
+  interface MessageStats {
+    total: number
+    unread: number
+    urgent: number
+    archived: number
+    averageResponseTime: string
+    responseRate: number
   }
 
-  // チャットルーム一覧
-  const chatRooms = [
-    {
-      id: 1,
-      student: {
-        name: "田中 太郎",
-        university: "東京大学 経済学部 2年生",
-        avatar: "T",
-        profileImage: "/placeholder.svg?height=40&width=40",
-      },
-      job: "Webマーケティングアシスタント",
-      lastMessage: "面談の件でご連絡いたします。来週の火曜日14:00はいかがでしょうか？",
-      timestamp: "14:30",
-      unreadCount: 2,
-      isRead: false,
-      hasAttachment: false,
-      status: "面談調整中",
-      priority: "normal",
-      isOnline: true,
-      lastSeen: "オンライン",
-    },
-    {
-      id: 2,
-      student: {
-        name: "佐藤 花子",
-        university: "早稲田大学 商学部 3年生",
-        avatar: "S",
-        profileImage: "/placeholder.svg?height=40&width=40",
-      },
-      job: "SNS運用サポート",
-      lastMessage: "資料をありがとうございました。質問があります。",
-      timestamp: "昨日",
-      unreadCount: 1,
-      isRead: false,
-      hasAttachment: true,
-      status: "書類確認中",
-      priority: "high",
-      isOnline: false,
-      lastSeen: "2時間前",
-    },
-    {
-      id: 3,
-      student: {
-        name: "山田 次郎",
-        university: "慶應義塾大学 理工学部 2年生",
-        avatar: "Y",
-        profileImage: "/placeholder.svg?height=40&width=40",
-      },
-      job: "データ分析補助",
-      lastMessage: "ありがとうございました！",
-      timestamp: "2日前",
-      unreadCount: 0,
-      isRead: true,
-      hasAttachment: false,
-      status: "完了",
-      priority: "normal",
-      isOnline: false,
-      lastSeen: "1日前",
-    },
-    {
-      id: 4,
-      student: {
-        name: "鈴木 美咲",
-        university: "上智大学 文学部 1年生",
-        avatar: "S",
-        profileImage: "/placeholder.svg?height=40&width=40",
-      },
-      job: "コンテンツ制作アシスタント",
-      lastMessage: "面談の準備について教えてください。",
-      timestamp: "3日前",
-      unreadCount: 0,
-      isRead: true,
-      hasAttachment: false,
-      status: "面談予定",
-      priority: "normal",
-      isOnline: true,
-      lastSeen: "オンライン",
-    },
-  ]
+  interface ChatRoom {
+    id: number
+    student: {
+      name: string
+      university: string
+      avatar: string
+      profileImage: string | null
+    }
+    job: string
+    lastMessage: string
+    timestamp: string
+    unreadCount: number
+    isRead: boolean
+    hasAttachment: boolean
+    status: string
+    priority: "high" | "normal" | "medium"
+    isOnline: boolean
+    lastSeen: string
+  }
 
-  // 個別チャットのメッセージ
-  const chatMessages = [
-    {
-      id: 1,
-      sender: "student",
-      content: "この度は弊社の求人にご応募いただき、ありがとうございます。",
-      timestamp: "10:30",
-      isRead: true,
-      type: "text",
-    },
-    {
-      id: 2,
-      sender: "company",
-      content: "書類選考の結果、面談をさせていただきたく思います。",
-      timestamp: "10:31",
-      isRead: true,
-      type: "text",
-    },
-    {
-      id: 3,
-      sender: "student",
-      content: "ありがとうございます！ぜひよろしくお願いいたします。",
-      timestamp: "11:15",
-      isRead: true,
-      type: "text",
-    },
-    {
-      id: 4,
-      sender: "company",
-      content: "面談の件でご連絡いたします。来週の火曜日14:00はいかがでしょうか？",
-      timestamp: "14:30",
-      isRead: false,
-      type: "text",
-    },
-  ]
+  interface ChatMessage {
+    id: number
+    sender: "student" | "company"
+    content: string
+    timestamp: string
+    isRead: boolean
+    type: "text" | "file"
+  }
+
+  const [messageStats, setMessageStats] = useState<MessageStats>({
+    total: 0,
+    unread: 0,
+    urgent: 0,
+    archived: 0,
+    averageResponseTime: "-",
+    responseRate: 0,
+  })
+
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+
+  // fetch chat rooms & stats once
+  useEffect(() => {
+    const sb = supabase as any
+
+    const loadRooms = async () => {
+      // ---- message stats (example RPC or aggregated view) ----
+      const { data: statRow } = await sb.rpc("company_message_stats") // ← 事前に用意していない場合は適宜変更
+      if (statRow) {
+        setMessageStats({
+          total: statRow.total ?? 0,
+          unread: statRow.unread ?? 0,
+          urgent: statRow.urgent ?? 0,
+          archived: statRow.archived ?? 0,
+          averageResponseTime: statRow.avg_response_time ?? "-",
+          responseRate: statRow.response_rate ?? 0,
+        })
+      }
+
+      // ---- chat rooms ----
+      const { data: rooms } = await sb
+        .from("chat_rooms_view") // ← 実際の view / table 名に合わせて修正
+        .select(
+          `
+            id,
+            last_message,
+            unread_count,
+            status,
+            priority,
+            last_seen,
+            is_online,
+            jobs(title),
+            student:profiles(full_name, university, avatar)
+          `
+        )
+        .order("last_message_at", { ascending: false })
+
+      setChatRooms(
+        (rooms ?? []).map((r: any) => ({
+          id: r.id,
+          student: {
+            name: r.student.full_name,
+            university: r.student.university,
+            avatar: r.student.avatar ?? r.student.full_name?.charAt(0) ?? "?",
+            profileImage: null,
+          },
+          job: r.jobs.title,
+          lastMessage: r.last_message ?? "",
+          timestamp: new Date(r.last_message_at ?? r.last_seen).toLocaleTimeString("ja-JP", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          unreadCount: r.unread_count ?? 0,
+          isRead: (r.unread_count ?? 0) === 0,
+          hasAttachment: false,
+          status: r.status ?? "面談調整中",
+          priority: (r.priority ?? "normal") as "high" | "medium" | "normal",
+          isOnline: r.is_online ?? false,
+          lastSeen: r.last_seen ? `${Math.floor((Date.now() - Date.parse(r.last_seen)) / 3600000)}時間前` : "オンライン",
+        }))
+      )
+
+      // set default selected chat
+      if (rooms && rooms.length > 0) setSelectedChat(rooms[0].id)
+    }
+
+    loadRooms()
+  }, [])
+
+  // fetch messages for selected chat
+  useEffect(() => {
+    if (!selectedChat) return
+    const sb = supabase as any
+
+    const loadMessages = async () => {
+      const { data: rows } = await sb
+        .from("messages")
+        .select("id,sender,content,created_at,is_read,type")
+        .eq("chat_room_id", selectedChat)
+        .order("created_at")
+
+      setChatMessages(
+        (rows ?? []).map((m: any) => ({
+          id: m.id,
+          sender: m.sender,
+          content: m.content,
+          timestamp: new Date(m.created_at).toLocaleTimeString("ja-JP", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          isRead: m.is_read,
+          type: m.type,
+        }))
+      )
+    }
+
+    loadMessages()
+  }, [selectedChat])
 
   const getStatusColor = (status: string) => {
     switch (status) {

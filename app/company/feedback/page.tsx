@@ -1,13 +1,15 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
+import { supabase } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Star, Search, Filter, Plus, Calendar, User, Briefcase, Download } from "lucide-react"
+import { Star, Search, Filter, Plus, Calendar as CalendarIcon, User, Briefcase, Download } from "lucide-react"
+import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
 import { ja } from "date-fns/locale"
 import type { DateRange } from "react-day-picker"
@@ -29,66 +31,6 @@ interface Feedback {
   sentAt?: Date
 }
 
-// サンプルデータ
-const sampleFeedbacks: Feedback[] = [
-  {
-    id: "1",
-    studentName: "田中太郎",
-    jobTitle: "フロントエンドエンジニア",
-    jobName: "React開発エンジニア募集",
-    rating: 4,
-    status: "sent",
-    createdAt: new Date("2024-01-15"),
-    updatedAt: new Date("2024-01-16"),
-    sentAt: new Date("2024-01-16"),
-    assignee: "山田花子",
-  },
-  {
-    id: "2",
-    studentName: "佐藤花子",
-    jobTitle: "バックエンドエンジニア",
-    jobName: "Node.js開発者募集",
-    rating: 5,
-    status: "draft",
-    createdAt: new Date("2024-01-14"),
-    updatedAt: new Date("2024-01-14"),
-    assignee: "鈴木一郎",
-  },
-  {
-    id: "3",
-    studentName: "高橋次郎",
-    jobTitle: "データサイエンティスト",
-    jobName: "AI・機械学習エンジニア",
-    rating: 3,
-    status: "scheduled",
-    createdAt: new Date("2024-01-13"),
-    updatedAt: new Date("2024-01-15"),
-    assignee: "田中三郎",
-  },
-  {
-    id: "4",
-    studentName: "伊藤美咲",
-    jobTitle: "UIデザイナー",
-    jobName: "プロダクトデザイナー募集",
-    rating: 4,
-    status: "sent",
-    createdAt: new Date("2024-01-12"),
-    updatedAt: new Date("2024-01-13"),
-    sentAt: new Date("2024-01-13"),
-    assignee: "山田花子",
-  },
-  {
-    id: "5",
-    studentName: "渡辺健太",
-    jobTitle: "プロダクトマネージャー",
-    jobName: "PM候補募集",
-    rating: 2,
-    status: "draft",
-    createdAt: new Date("2024-01-11"),
-    updatedAt: new Date("2024-01-12"),
-    assignee: "鈴木一郎",
-  },
-]
 
 const statusConfig = {
   draft: { label: "下書き", color: "bg-gray-500" },
@@ -109,8 +51,54 @@ export default function CompanyFeedbackPage() {
     to: undefined,
   })
 
+  // ---- Supabase data ----
+  const [feedbacks, setFeedbacks] = useState<Feedback[]>([])
+
+  useEffect(() => {
+    const sb = supabase as any
+
+    const fetchFeedbacks = async () => {
+      const { data, error } = await sb
+        .from("feedbacks")                            // ← テーブル名を合わせてください
+        .select(`
+          id,
+          rating,
+          status,
+          created_at,
+          updated_at,
+          sent_at,
+          assignee,
+          jobs(title, name),
+          profiles(full_name)
+        `)
+        .order("created_at", { ascending: false })
+
+      if (error) {
+        console.error("feedback fetch error", error)
+        return
+      }
+
+      setFeedbacks(
+        (data ?? []).map((row: any) => ({
+          id: row.id,
+          studentName: row.profiles.full_name,
+          jobTitle: row.jobs.title,
+          jobName: row.jobs.name,
+          rating: row.rating ?? 0,
+          status: row.status as FeedbackStatus,
+          createdAt: new Date(row.created_at),
+          updatedAt: new Date(row.updated_at),
+          sentAt: row.sent_at ? new Date(row.sent_at) : undefined,
+          assignee: row.assignee ?? "-",
+        }))
+      )
+    }
+
+    fetchFeedbacks()
+  }, [])
+
   const filteredAndSortedFeedbacks = useMemo(() => {
-    const filtered = sampleFeedbacks.filter((feedback) => {
+    const filtered = feedbacks.filter((feedback) => {
       const matchesSearch =
         feedback.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         feedback.jobName.toLowerCase().includes(searchTerm.toLowerCase())
@@ -286,7 +274,7 @@ export default function CompanyFeedbackPage() {
                     !dateRange?.from && "text-muted-foreground"
                   }`}
                 >
-                  <Calendar className="mr-2 h-4 w-4" />
+                  <CalendarIcon className="mr-2 h-4 w-4" />
                   {dateRange?.from ? (
                     dateRange.to ? (
                       <>
@@ -410,13 +398,13 @@ export default function CompanyFeedbackPage() {
                     <TableCell>{getStatusBadge(feedback.status)}</TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <CalendarIcon className="w-4 h-4 text-gray-400" />
                         {format(feedback.createdAt, "yyyy/MM/dd", { locale: ja })}
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-gray-400" />
+                        <CalendarIcon className="w-4 h-4 text-gray-400" />
                         {format(feedback.updatedAt, "yyyy/MM/dd", { locale: ja })}
                       </div>
                     </TableCell>

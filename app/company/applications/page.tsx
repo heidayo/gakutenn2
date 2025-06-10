@@ -1,3 +1,5 @@
+"use client"; // ───── React hooks を使うためにクライアントコンポーネント化
+
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -21,73 +23,108 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase/client"
+
 export default function ApplicationsPage() {
-  const stats = {
-    total: 45,
-    pending: 18,
-    interviewing: 12,
-    hired: 8,
-    rejected: 7,
+  // ---------- Supabase-backed state ----------
+  interface ApplicationRow {
+    id: string
+    name: string
+    university: string
+    location: string
+    appliedDate: string
+    jobTitle: string
+    status: string
+    statusColor: string
+    rating: number
+    profileCompletion: number
+    hasInterview: boolean
+    matchScore: number
   }
 
-  const applications = [
-    {
-      id: 1,
-      name: "田中 太郎",
-      university: "東京大学 経済学部 2年生",
-      location: "東京都",
-      appliedDate: "2024年6月1日",
-      jobTitle: "Webマーケティングアシスタント",
-      status: "書類選考中",
-      statusColor: "bg-yellow-100 text-yellow-800",
-      rating: 4.3,
-      profileCompletion: 85,
-      hasInterview: false,
-      matchScore: 92,
-    },
-    {
-      id: 2,
-      name: "佐藤 花子",
-      university: "早稲田大学 商学部 3年生",
-      location: "東京都",
-      appliedDate: "2024年5月30日",
-      jobTitle: "SNS運用サポート",
-      status: "面談予定",
-      statusColor: "bg-blue-100 text-blue-800",
-      rating: 4.6,
-      profileCompletion: 92,
-      hasInterview: true,
-      matchScore: 88,
-    },
-    {
-      id: 3,
-      name: "山田 次郎",
-      university: "慶應義塾大学 理工学部 2年生",
-      location: "神奈川県",
-      appliedDate: "2024年5月28日",
-      jobTitle: "データ分析補助",
-      status: "合格",
-      statusColor: "bg-green-100 text-green-800",
-      rating: 4.8,
-      profileCompletion: 78,
-      hasInterview: false,
-      matchScore: 95,
-    },
-    {
-      id: 4,
-      name: "鈴木 美咲",
-      university: "上智大学 文学部 1年生",
-      location: "東京都",
-      appliedDate: "2024年5月25日",
-      jobTitle: "コンテンツ制作アシスタント",
-      status: "不合格",
-      statusColor: "bg-red-100 text-red-800",
-      rating: 3.8,
-      profileCompletion: 65,
-      hasInterview: false,
-      matchScore: 72,
-    },
-  ]
+  const [stats, setStats] = useState({
+    total: 0,
+    pending: 0,
+    interviewing: 0,
+    hired: 0,
+    rejected: 0,
+  })
+
+  const [applications, setApplications] = useState<ApplicationRow[]>([])
+
+  useEffect(() => {
+    const sb = supabase as any
+
+    const fetchData = async () => {
+      // ---- counts by status ----
+      const [{ count: total }, { count: pending }, { count: interviewing }, { count: hired }, { count: rejected }] =
+        await Promise.all([
+          sb.from("applications").select("id", { count: "exact", head: true }),
+          sb.from("applications").select("id", { count: "exact", head: true }).eq("status", "書類選考中"),
+          sb.from("applications").select("id", { count: "exact", head: true }).eq("status", "面談予定"),
+          sb.from("applications").select("id", { count: "exact", head: true }).eq("status", "合格"),
+          sb.from("applications").select("id", { count: "exact", head: true }).eq("status", "不合格"),
+        ])
+
+      setStats({
+        total: total ?? 0,
+        pending: pending ?? 0,
+        interviewing: interviewing ?? 0,
+        hired: hired ?? 0,
+        rejected: rejected ?? 0,
+      })
+
+      // ---- application list ----
+      const { data: rows } = await sb
+        .from("applications")
+        .select(
+          `
+            id,
+            applied_at,
+            status,
+            rating,
+            profile_completion,
+            match_score,
+            has_interview,
+            jobs:title,
+            profiles:profiles(full_name, university, location)
+          `
+        )
+        .order("applied_at", { ascending: false })
+        .limit(50)
+
+      const mapStatusColor = (status: string) =>
+        status === "書類選考中"
+          ? "bg-yellow-100 text-yellow-800"
+          : status === "面談予定"
+          ? "bg-blue-100 text-blue-800"
+          : status === "合格"
+          ? "bg-green-100 text-green-800"
+          : status === "不合格"
+          ? "bg-red-100 text-red-800"
+          : "bg-gray-100 text-gray-800"
+
+      setApplications(
+        (rows ?? []).map((r: any) => ({
+          id: r.id,
+          name: r.profiles.full_name,
+          university: `${r.profiles.university}`,
+          location: r.profiles.location ?? "-",
+          appliedDate: new Date(r.applied_at).toLocaleDateString("ja-JP"),
+          jobTitle: r.jobs.title,
+          status: r.status,
+          statusColor: mapStatusColor(r.status),
+          rating: r.rating ?? 0,
+          profileCompletion: r.profile_completion ?? 0,
+          hasInterview: r.has_interview ?? false,
+          matchScore: r.match_score ?? 0,
+        }))
+      )
+    }
+
+    fetchData()
+  }, [])
 
   const getStatusIcon = (status: string) => {
     switch (status) {

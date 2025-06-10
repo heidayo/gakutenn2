@@ -20,96 +20,157 @@ import {
   ArrowRight,
 } from "lucide-react"
 import Link from "next/link"
+import { useEffect, useState } from "react"
+import { supabase } from "@/lib/supabase/client"   // Supabase browser client
 
 export default function CompanyDashboard() {
-  // KPI データ
-  const kpis = {
-    totalJobs: { value: 12, change: 20, trend: "up" },
-    activeJobs: { value: 8, change: 14.3, trend: "up" },
-    totalApplications: { value: 156, change: 32.8, trend: "up" },
-    totalInterviews: { value: 45, change: 27.8, trend: "up" },
-    totalHires: { value: 18, change: 60.0, trend: "up" },
-    responseRate: { value: 78, change: -5.2, trend: "down" },
+  // ---------- Supabase‑backed state ----------
+
+  type Trend = "up" | "down"
+
+  interface KPIData {
+    value: number
+    change: number
+    trend: Trend
   }
 
-  // 最近の応募者
-  const recentApplications = [
-    {
-      id: 1,
-      name: "田中 太郎",
-      job: "Webマーケティングアシスタント",
-      appliedDate: "2024年6月1日",
-      status: "書類選考中",
-      rating: 4.3,
-      university: "東京大学",
-    },
-    {
-      id: 2,
-      name: "佐藤 花子",
-      job: "SNS運用サポート",
-      appliedDate: "2024年5月30日",
-      status: "面談予定",
-      rating: 4.6,
-      university: "早稲田大学",
-    },
-    {
-      id: 3,
-      name: "山田 次郎",
-      job: "データ分析補助",
-      appliedDate: "2024年5月28日",
-      status: "合格",
-      rating: 4.8,
-      university: "慶應義塾大学",
-    },
-  ]
+  interface KPIs {
+    totalJobs: KPIData
+    activeJobs: KPIData
+    totalApplications: KPIData
+    totalInterviews: KPIData
+    totalHires: KPIData
+    responseRate: KPIData
+  }
 
-  // 面談予定
-  const upcomingInterviews = [
-    {
-      id: 1,
-      applicant: "田中 太郎",
-      job: "Webマーケティングアシスタント",
-      date: "2024年6月5日",
-      time: "14:00",
-      type: "オンライン",
-    },
-    {
-      id: 2,
-      applicant: "佐藤 花子",
-      job: "SNS運用サポート",
-      date: "2024年6月6日",
-      time: "16:00",
-      type: "対面",
-    },
-  ]
+  interface Application {
+    id: string
+    name: string
+    job: string
+    appliedDate: string
+    status: string
+    rating: number
+    university: string
+  }
 
-  // 求人パフォーマンス
-  const jobPerformance = [
-    {
-      id: 1,
-      title: "Webマーケティングアシスタント",
-      applications: 23,
-      views: 245,
-      conversionRate: 9.4,
-      status: "公開中",
-    },
-    {
-      id: 2,
-      title: "SNS運用サポート",
-      applications: 18,
-      views: 189,
-      conversionRate: 9.5,
-      status: "公開中",
-    },
-    {
-      id: 3,
-      title: "データ分析補助",
-      applications: 0,
-      views: 0,
-      conversionRate: 0,
-      status: "下書き",
-    },
-  ]
+  interface Interview {
+    id: string
+    applicant: string
+    job: string
+    date: string
+    time: string
+    type: string
+  }
+
+  interface JobPerf {
+    id: string
+    title: string
+    applications: number
+    views: number
+    conversionRate: number
+    status: string
+  }
+
+  const [kpis, setKpis] = useState<KPIs>({
+    totalJobs: { value: 0, change: 0, trend: "up" },
+    activeJobs: { value: 0, change: 0, trend: "up" },
+    totalApplications: { value: 0, change: 0, trend: "up" },
+    totalInterviews: { value: 0, change: 0, trend: "up" },
+    totalHires: { value: 0, change: 0, trend: "up" },
+    responseRate: { value: 0, change: 0, trend: "up" },
+  })
+  const [recentApplications, setRecentApplications] = useState<Application[]>([])
+  const [upcomingInterviews, setUpcomingInterviews] = useState<Interview[]>([])
+  const [jobPerformance, setJobPerformance] = useState<JobPerf[]>([])
+
+  useEffect(() => {
+    const fetchData = async () => {
+      // 型エラー回避用 — 型が揃うまで any キャスト
+      const sb = supabase as any
+      // ------ KPI counts ------
+      const [{ count: totalJobs }, { count: activeJobs }] = await Promise.all([
+        sb.from("jobs").select("id", { count: "exact", head: true }),
+        sb.from("jobs").select("id", { count: "exact", head: true }).eq("is_active", true),
+      ])
+
+      const [{ count: totalApplications }, { count: totalHires }] = await Promise.all([
+        sb.from("applications").select("id", { count: "exact", head: true }),
+        sb.from("applications").select("id", { count: "exact", head: true }).eq("status", "合格"),
+      ])
+
+      // ------ Upcoming interviews ------
+      const { data: interviewRows } = await sb
+        .from("interviews")
+        .select("id,date,time,type,job:title,profiles!inner(full_name)")
+        .gte("date", new Date().toISOString().slice(0, 10))
+        .order("date")
+
+      // ------ Recent applications ------
+      const { data: recentAppRows } = await sb
+        .from("applications")
+        .select("id,applied_at,status,rating,job:title,profiles!inner(full_name,university)")
+        .order("applied_at", { ascending: false })
+        .limit(3)
+
+      // ------ Job performance ------
+      const { data: jobRows } = await sb
+        .from("jobs")
+        .select("id,title,views,applications,is_active")
+
+      // (任意) 応答率を RPC で計算している例。なければ 0 を設定
+      const { data: respStat } = await sb.rpc("calculate_response_rate")
+      const responseRate = respStat?.rate ?? 0
+
+      // ---------- state 更新 ----------
+      setKpis({
+        totalJobs: { value: totalJobs ?? 0, change: 0, trend: "up" },
+        activeJobs: { value: activeJobs ?? 0, change: 0, trend: "up" },
+        totalApplications: { value: totalApplications ?? 0, change: 0, trend: "up" },
+        totalInterviews: { value: interviewRows?.length ?? 0, change: 0, trend: "up" },
+        totalHires: { value: totalHires ?? 0, change: 0, trend: "up" },
+        responseRate: { value: responseRate, change: 0, trend: responseRate >= 0 ? "up" : "down" },
+      })
+
+      setRecentApplications(
+        recentAppRows?.map((r: any) => ({
+          id: r.id,
+          name: r.profiles.full_name,
+          university: r.profiles.university,
+          job: r.job,
+          appliedDate: new Date(r.applied_at).toLocaleDateString("ja-JP"),
+          status: r.status,
+          rating: r.rating,
+        })) ?? []
+      )
+
+      setUpcomingInterviews(
+        interviewRows?.map((row: any) => ({
+          id: row.id,
+          applicant: row.profiles.full_name,
+          job: row.job,
+          date: row.date,
+          time: row.time,
+          type: row.type,
+        })) ?? []
+      )
+
+      setJobPerformance(
+        jobRows?.map((row: any) => ({
+          id: row.id,
+          title: row.title,
+          applications: row.applications ?? 0,
+          views: row.views ?? 0,
+          conversionRate:
+            row.views && row.views > 0
+              ? Math.round(((row.applications ?? 0) / row.views) * 1000) / 10
+              : 0,
+          status: row.is_active ? "公開中" : "下書き",
+        })) ?? []
+      )
+    }
+
+    fetchData()
+  }, [])
 
   const getTrendIcon = (trend: string, change: number) => {
     if (trend === "up") {
@@ -303,7 +364,7 @@ export default function CompanyDashboard() {
                       </div>
                     </div>
                     <div className="text-right">
-                      <Badge className={getStatusColor(application.status)} size="sm">
+                      <Badge className={`${getStatusColor(application.status)} text-xs`}>
                         {application.status}
                       </Badge>
                       <div className="flex items-center space-x-1 mt-1">

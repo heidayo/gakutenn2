@@ -1,6 +1,9 @@
-import { BarChart3, Briefcase, Users, MessageSquare, Settings, Building2, Plus, FileText, Star } from "lucide-react"
+"use client";
+
+import { BarChart3, Briefcase, Users, MessageSquare, Settings, Building2, Plus, FileText, Star, Calendar } from "lucide-react"
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase/client";
 import Link from "next/link"
-import { Badge } from "@/components/ui/badge"
 import { Logo } from "@/components/logo"
 import {
   Sidebar,
@@ -31,27 +34,55 @@ const menuItems = [
     title: "応募者管理",
     url: "/company/applications",
     icon: Users,
-    badge: 5,
+  },
+  {
+    title: "面接管理",
+    url: "/company/interviews",
+    icon: Calendar,
   },
   {
     title: "メッセージ",
     url: "/company/messages",
     icon: MessageSquare,
-    badge: 3,
   },
   {
     title: "フィードバック",
     url: "/company/feedback",
     icon: Star,
   },
-  {
-    title: "設定",
-    url: "/company/settings",
-    icon: Settings,
-  },
 ]
 
 export function CompanySidebar() {
+  const [companyName, setCompanyName] = useState<string>("");
+  const [fullName, setFullName] = useState<string>("");
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (!user) return;
+
+      // 企業名を取得
+      const { data: company } = await supabase
+        .from("companies")
+        .select("name")
+        .eq("admin_user_id", user.id)
+        .single();
+      if (company?.name) setCompanyName(company.name);
+
+      // ユーザー氏名を取得
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("user_id", user.id)
+        .single();
+      if (profile?.full_name) setFullName(profile.full_name);
+    };
+
+    fetchProfile();
+  }, []);
+
   return (
     <Sidebar>
       <SidebarHeader className="border-b px-6 py-4">
@@ -72,9 +103,6 @@ export function CompanySidebar() {
                     >
                       <item.icon className="h-5 w-5" />
                       <span>{item.title}</span>
-                      {item.badge && (
-                        <Badge className="ml-auto bg-red-500 text-white text-xs px-1.5 py-0.5">{item.badge}</Badge>
-                      )}
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -120,8 +148,7 @@ export function CompanySidebar() {
             <Building2 className="h-4 w-4 text-orange-600" />
           </div>
           <div className="flex-1">
-            <p className="text-sm font-semibold">株式会社テックスタート</p>
-            <p className="text-xs text-gray-600">管理者</p>
+            <p className="text-sm font-semibold">{companyName || "会社名"}</p>
           </div>
         </div>
       </SidebarFooter>

@@ -35,6 +35,8 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
+import { useEffect } from "react"
+import { supabase } from "@/lib/supabase/client"
 
 export default function JobsPage() {
   const [selectedJobs, setSelectedJobs] = useState<number[]>([])
@@ -42,134 +44,172 @@ export default function JobsPage() {
   const [filterStatus, setFilterStatus] = useState("all")
   const [sortBy, setSortBy] = useState("created_desc")
 
-  // 統計データ
-  const stats = {
-    totalJobs: 12,
-    activeJobs: 8,
-    totalApplications: 156,
-    totalInterviews: 45,
-    totalHires: 18,
-    averageApplications: 13,
-    conversionRate: 11.5,
-    responseRate: 78,
+
+  // ---------- Supabase 連携 ----------
+  interface JobRow {
+    id: number
+    title: string
+    category: string | null
+    status: "published" | "draft" | "paused" | "expired"
+    created_at: string
+    published_at: string | null
+    expires_at: string | null
+    location: string | null
+    salary_text: string | null
+    work_type: string | null
+    tags: string[]
+    applications_count: number
+    views_count: number
+    interviews_count: number
+    hires_count: number
+    is_urgent: boolean
+    isUrgent?: boolean
+    // ---- UI derived fields ----
+    statusLabel?: string
+    statusColor?: string
+    createdDate: string
+    publishedDate?: string
+    expiryDate?: string
+    salary?: string
+    workType?: string
+    applications: number
+    views: number
+    interviews: number
+    hires: number
+    conversionRate: number
   }
 
-  // 期間別統計（過去30日）
-  const periodStats = {
-    applications: { current: 89, previous: 67, change: 32.8 },
-    interviews: { current: 23, previous: 18, change: 27.8 },
-    hires: { current: 8, previous: 5, change: 60.0 },
-    views: { current: 1240, previous: 980, change: 26.5 },
-  }
+  const [jobs, setJobs] = useState<JobRow[]>([])
+  const [stats, setStats] = useState({
+    totalJobs: 0,
+    activeJobs: 0,
+    totalApplications: 0,
+    totalInterviews: 0,
+    totalHires: 0,
+    averageApplications: 0,
+    conversionRate: 0,
+    responseRate: 0,
+  })
+  const [periodStats, setPeriodStats] = useState({
+    applications: { current: 0, previous: 0, change: 0 },
+    interviews: { current: 0, previous: 0, change: 0 },
+    hires: { current: 0, previous: 0, change: 0 },
+    views: { current: 0, previous: 0, change: 0 },
+  })
 
-  // 求人データ
-  const jobs = [
-    {
-      id: 1,
-      title: "Webマーケティングアシスタント",
-      category: "マーケティング",
-      status: "published",
-      statusLabel: "公開中",
-      statusColor: "bg-green-100 text-green-800",
-      createdDate: "2024年5月28日",
-      publishedDate: "2024年5月30日",
-      expiryDate: "2024年7月30日",
-      location: "東京都渋谷区",
-      salary: "時給1,200円",
-      workType: "週1回〜",
-      applications: 23,
-      views: 245,
-      interviews: 8,
-      hires: 3,
-      conversionRate: 13.0,
-      tags: ["未経験歓迎", "週1OK", "リモート可"],
-      isUrgent: false,
-    },
-    {
-      id: 2,
-      title: "SNS運用サポート",
-      category: "クリエイティブ",
-      status: "published",
-      statusLabel: "公開中",
-      statusColor: "bg-green-100 text-green-800",
-      createdDate: "2024年5月25日",
-      publishedDate: "2024年5月26日",
-      expiryDate: "2024年7月26日",
-      location: "大阪府大阪市",
-      salary: "日給8,000円",
-      workType: "単発OK",
-      applications: 18,
-      views: 189,
-      interviews: 6,
-      hires: 2,
-      conversionRate: 11.1,
-      tags: ["単発OK", "土日可", "交通費支給"],
-      isUrgent: true,
-    },
-    {
-      id: 3,
-      title: "データ分析補助",
-      category: "データ分析",
-      status: "draft",
-      statusLabel: "下書き",
-      statusColor: "bg-gray-100 text-gray-800",
-      createdDate: "2024年6月1日",
-      publishedDate: "",
-      expiryDate: "",
-      location: "リモート",
-      salary: "時給1,000円",
-      workType: "週2回〜",
-      applications: 0,
-      views: 0,
-      interviews: 0,
-      hires: 0,
-      conversionRate: 0,
-      tags: ["リモート", "未経験歓迎", "平日のみ"],
-      isUrgent: false,
-    },
-    {
-      id: 4,
-      title: "コンテンツ制作アシスタント",
-      category: "クリエイティブ",
-      status: "paused",
-      statusLabel: "一時停止",
-      statusColor: "bg-yellow-100 text-yellow-800",
-      createdDate: "2024年5月20日",
-      publishedDate: "2024年5月22日",
-      expiryDate: "2024年7月22日",
-      location: "東京都新宿区",
-      salary: "時給1,100円",
-      workType: "週1回〜",
-      applications: 15,
-      views: 156,
-      interviews: 4,
-      hires: 1,
-      conversionRate: 6.7,
-      tags: ["週1OK", "学生歓迎", "交通費支給"],
-      isUrgent: false,
-    },
-    {
-      id: 5,
-      title: "営業アシスタント",
-      category: "営業",
-      status: "expired",
-      statusLabel: "期限切れ",
-      statusColor: "bg-red-100 text-red-800",
-      createdDate: "2024年4月15日",
-      publishedDate: "2024年4月16日",
-      expiryDate: "2024年5月16日",
-      location: "東京都港区",
-      salary: "時給1,300円",
-      workType: "週2回〜",
-      applications: 31,
-      views: 298,
-      interviews: 12,
-      hires: 4,
-      conversionRate: 12.9,
-      tags: ["高時給", "週2OK", "交通費支給"],
-      isUrgent: false,
-    },
-  ]
+  useEffect(() => {
+    const sb = supabase as any
+
+    const loadJobs = async () => {
+      // ------ jobs with aggregated counts ------
+      const { data: jobRows } = await sb
+        .from("jobs")
+        .select(
+          `
+          id,
+          title,
+          category,
+          status,
+          created_at,
+          published_at,
+          expires_at,
+          location,
+          salary_text,
+          work_type,
+          tags,
+          is_urgent,
+          applications_count,
+          views_count,
+          interviews_count,
+          hires_count
+        `
+        )
+
+      setJobs(
+        (jobRows ?? []).map((row: any) => ({
+          id: row.id,
+          title: row.title,
+          category: row.category ?? "その他",
+          status: row.status,
+          statusLabel:
+            row.status === "published"
+              ? "公開中"
+              : row.status === "draft"
+              ? "下書き"
+              : row.status === "paused"
+              ? "一時停止"
+              : "期限切れ",
+          statusColor:
+            row.status === "published"
+              ? "bg-green-100 text-green-800"
+              : row.status === "draft"
+              ? "bg-gray-100 text-gray-800"
+              : row.status === "paused"
+              ? "bg-yellow-100 text-yellow-800"
+              : "bg-red-100 text-red-800",
+          createdDate: new Date(row.created_at).toLocaleDateString("ja-JP"),
+          publishedDate: row.published_at ? new Date(row.published_at).toLocaleDateString("ja-JP") : "",
+          expiryDate: row.expires_at ? new Date(row.expires_at).toLocaleDateString("ja-JP") : "",
+          location: row.location ?? "未設定",
+          salary: row.salary_text ?? "-",
+          workType: row.work_type ?? "-",
+          applications: row.applications_count ?? 0,
+          views: row.views_count ?? 0,
+          interviews: row.interviews_count ?? 0,
+          hires: row.hires_count ?? 0,
+          conversionRate:
+            row.views_count && row.views_count > 0
+              ? Math.round((row.hires_count / row.views_count) * 1000) / 10
+              : 0,
+          tags: row.tags ?? [],
+          isUrgent: row.is_urgent,
+        }))
+      )
+
+      // ------ aggregate stats ------
+      const [
+        { count: totalJobs },
+        { count: activeJobs },
+        { count: totalApplications },
+        { count: totalInterviews },
+        { count: totalHires },
+      ] = await Promise.all([
+        sb.from("jobs").select("id", { count: "exact", head: true }),
+        sb.from("jobs").select("id", { count: "exact", head: true }).eq("status", "published"),
+        sb.from("applications").select("id", { count: "exact", head: true }),
+        sb.from("interviews").select("id", { count: "exact", head: true }),
+        sb.from("applications").select("id", { count: "exact", head: true }).eq("status", "合格"),
+      ])
+
+      const avgApps =
+        totalJobs && totalJobs > 0 ? Math.round(((totalApplications ?? 0) / totalJobs) * 10) / 10 : 0
+      const convRate =
+        totalApplications && totalApplications > 0
+          ? Math.round(((totalHires ?? 0) / totalApplications) * 1000) / 10
+          : 0
+
+      setStats({
+        totalJobs: totalJobs ?? 0,
+        activeJobs: activeJobs ?? 0,
+        totalApplications: totalApplications ?? 0,
+        totalInterviews: totalInterviews ?? 0,
+        totalHires: totalHires ?? 0,
+        averageApplications: avgApps,
+        conversionRate: convRate,
+        responseRate: 0, // TODO: calculate via RPC if available
+      })
+
+      // ------ period stats (placeholder zero) ------
+      setPeriodStats({
+        applications: { current: 0, previous: 0, change: 0 },
+        interviews: { current: 0, previous: 0, change: 0 },
+        hires: { current: 0, previous: 0, change: 0 },
+        views: { current: 0, previous: 0, change: 0 },
+      })
+    }
+
+    loadJobs()
+  }, [])
 
   const handleSelectJob = (jobId: number) => {
     setSelectedJobs((prev) => (prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]))
