@@ -93,22 +93,20 @@ export default function SearchPage() {
     industry: [] as string[],
     jobType: [] as string[], // 職種フィルタを追加
     benefits: [] as string[],
-    timeSlot: [] as string[],
     hashtags: [] as string[], // ハッシュタグフィルタを追加
     remote: false,
   })
 
   // フィルタの展開状態
   const [expandedSections, setExpandedSections] = useState({
-    salary: true,
-    period: true,
+    salary: false,
+    period: false,
     jobType: false,
     location: false,
     industry: false,
     benefits: false,
-    timeSlot: false,
     hashtags: false, // ハッシュタグセクションを追加
-    remote: true,
+    remote: false,
   })
 
   // セクション展開切り替え関数
@@ -187,10 +185,6 @@ export default function SearchPage() {
         if (!hasBenefit) return false
       }
 
-      // 時間帯フィルタ
-      if (filters.timeSlot.length > 0 && !filters.timeSlot.includes(job.timeSlot)) {
-        return false
-      }
 
       // ハッシュタグフィルタ
       if (filters.hashtags.length > 0) {
@@ -244,7 +238,6 @@ export default function SearchPage() {
       industry: [],
       jobType: [],
       benefits: [],
-      timeSlot: [],
       hashtags: [],
       remote: false,
     })
@@ -258,7 +251,6 @@ export default function SearchPage() {
     (filters.industry.length > 0 ? 1 : 0) +
     (filters.jobType.length > 0 ? 1 : 0) +
     (filters.benefits.length > 0 ? 1 : 0) +
-    (filters.timeSlot.length > 0 ? 1 : 0) +
     (filters.hashtags.length > 0 ? 1 : 0) +
     (filters.remote ? 1 : 0) +
     (filters.salary[0] !== 1000 || filters.salary[1] !== 3000 ? 1 : 0) +
@@ -273,8 +265,6 @@ export default function SearchPage() {
         return filters.salary[0] === 1000 && filters.salary[1] === 3000
           ? "指定なし"
           : `¥${filters.salary[0]} - ¥${filters.salary[1]}`
-      case "timeSlot":
-        return filters.timeSlot.length > 0 ? filters.timeSlot.join(", ") : "指定なし"
       case "benefits":
         return filters.benefits.length > 0 ? filters.benefits.join(", ") : "指定なし"
       case "excludeKeywords":
@@ -573,49 +563,6 @@ export default function SearchPage() {
                     </CollapsibleContent>
                   </Collapsible>
 
-                  {/* 時間帯フィルタ */}
-                  <Collapsible open={expandedSections.timeSlot} onOpenChange={() => toggleSection("timeSlot")}>
-                    <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
-                      <div className="flex items-center space-x-3">
-                        <Clock className="h-5 w-5 text-gray-600" />
-                        <span className="text-sm font-medium">時間帯</span>
-                      </div>
-                      <ChevronDown
-                        className={`h-4 w-4 transition-transform ${expandedSections.timeSlot ? "rotate-180" : ""}`}
-                      />
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="px-3 pt-3">
-                      <div className="space-y-2">
-                        {[
-                          "朝（9:00-12:00）",
-                          "昼（12:00-18:00）",
-                          "夕方（18:00-21:00）",
-                          "夜間（21:00-24:00）",
-                          "深夜（24:00-6:00）",
-                        ].map((timeSlot) => (
-                          <div key={timeSlot} className="flex items-center space-x-2">
-                            <Checkbox
-                              id={timeSlot}
-                              checked={filters.timeSlot.includes(timeSlot)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setFilters((prev) => ({ ...prev, timeSlot: [...prev.timeSlot, timeSlot] }))
-                                } else {
-                                  setFilters((prev) => ({
-                                    ...prev,
-                                    timeSlot: prev.timeSlot.filter((t) => t !== timeSlot),
-                                  }))
-                                }
-                              }}
-                            />
-                            <label htmlFor={timeSlot} className="text-sm">
-                              {timeSlot}
-                            </label>
-                          </div>
-                        ))}
-                      </div>
-                    </CollapsibleContent>
-                  </Collapsible>
 
                   {/* ハッシュタグフィルタ */}
                   <Collapsible open={expandedSections.hashtags} onOpenChange={() => toggleSection("hashtags")}>

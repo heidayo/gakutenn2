@@ -46,38 +46,42 @@ export default function JobsPage() {
 
 
   // ---------- Supabase 連携 ----------
-  interface JobRow {
-    id: number
-    title: string
-    category: string | null
-    status: "published" | "draft" | "paused" | "expired"
-    created_at: string
-    published_at: string | null
-    expires_at: string | null
-    location: string | null
-    salary_text: string | null
-    work_type: string | null
-    tags: string[]
-    applications_count: number
-    views_count: number
-    interviews_count: number
-    hires_count: number
-    is_urgent: boolean
-    isUrgent?: boolean
-    // ---- UI derived fields ----
-    statusLabel?: string
-    statusColor?: string
-    createdDate: string
-    publishedDate?: string
-    expiryDate?: string
-    salary?: string
-    workType?: string
-    applications: number
-    views: number
-    interviews: number
-    hires: number
-    conversionRate: number
-  }
+interface JobRow {
+  id: number
+  title: string
+  category: string | null
+  status: "published" | "draft" | "paused" | "expired"
+
+  // --- ↓ ここをすべて ? にする ---
+  created_at?: string
+  publish_date?: string | null
+  expires_date?: string | null
+  location?: string | null
+  salary_text?: string | null
+  work_type?: string | null
+  tags?: string[]
+  applications_count?: number
+  views_count?: number
+  interviews_count?: number
+  hires_count?: number
+  is_urgent?: boolean
+  // --- ↑ ---------------------------
+
+  // ---- UI derived fields ----
+  statusLabel?: string
+  statusColor?: string
+  createdDate: string
+  publishedDate?: string
+  expiryDate?: string
+  salary?: string
+  workType?: string
+  applications: number
+  views: number
+  interviews: number
+  hires: number
+  conversionRate: number
+  originalCreatedAt: string
+}
 
   const [jobs, setJobs] = useState<JobRow[]>([])
   const [stats, setStats] = useState({
@@ -101,68 +105,105 @@ export default function JobsPage() {
   const loadJobs = async () => {
     const sb = supabase as any
     // ------ jobs with aggregated counts ------
-    const { data: jobRows } = await sb
+    const { data: jobRows, error } = await sb
       .from("jobs")
-      .select(
-        `
+      .select(`
         id,
         title,
         category,
-        status,
-        created_at,
-        published_at,
-        expires_at,
+        description,
+        responsibilities,
+        requirements,
         location,
-        salary_text,
-        work_type,
+        salary,
+        salary_type,
+        work_days,
+        work_hours,
+        duration,
+        start_date,
+        remote,
+        remote_details,
+        frequency,
+        benefits,
+        selection_steps,
+        mentor_name,
+        mentor_role,
+        mentor_experience,
+        mentor_message,
+        status,
+        publish_date,
         tags,
-        is_urgent,
-        applications_count,
-        views_count,
-        interviews_count,
-        hires_count
-      `
-      )
+        created_at,
+        updated_at,
+        search_vector
+      `)
+
+    if (error) {
+      console.error("Error loading jobs:", error)
+      setJobs([])
+      return
+    }
 
     setJobs(
-      (jobRows ?? []).map((row: any) => ({
-        id: row.id,
-        title: row.title,
-        category: row.category ?? "その他",
-        status: row.status,
-        statusLabel:
-          row.status === "published"
-            ? "公開中"
-            : row.status === "draft"
-            ? "下書き"
-            : row.status === "paused"
-            ? "一時停止"
-            : "期限切れ",
-        statusColor:
-          row.status === "published"
-            ? "bg-green-100 text-green-800"
-            : row.status === "draft"
-            ? "bg-gray-100 text-gray-800"
-            : row.status === "paused"
-            ? "bg-yellow-100 text-yellow-800"
-            : "bg-red-100 text-red-800",
-        createdDate: new Date(row.created_at).toLocaleDateString("ja-JP"),
-        publishedDate: row.published_at ? new Date(row.published_at).toLocaleDateString("ja-JP") : "",
-        expiryDate: row.expires_at ? new Date(row.expires_at).toLocaleDateString("ja-JP") : "",
-        location: row.location ?? "未設定",
-        salary: row.salary_text ?? "-",
-        workType: row.work_type ?? "-",
-        applications: row.applications_count ?? 0,
-        views: row.views_count ?? 0,
-        interviews: row.interviews_count ?? 0,
-        hires: row.hires_count ?? 0,
-        conversionRate:
-          row.views_count && row.views_count > 0
-            ? Math.round((row.hires_count / row.views_count) * 1000) / 10
-            : 0,
-        tags: row.tags ?? [],
-        isUrgent: row.is_urgent,
-      }))
+      (jobRows ?? []).map((row: any): JobRow => {
+        // --- tags を必ず string[] に変換 ---
+        const tagArray: string[] = Array.isArray(row.tags)
+          ? row.tags
+          : row.tags
+          ? String(row.tags)
+              .replace(/[{}"]/g, "")
+              .split(",")
+              .filter(Boolean)
+          : []
+
+        return {
+          id: row.id,
+          title: row.title,
+          category: row.category ?? "その他",
+          status: row.status,
+          statusLabel:
+            row.status === "published"
+              ? "公開中"
+              : row.status === "draft"
+              ? "下書き"
+              : row.status === "paused"
+              ? "一時停止"
+              : "期限切れ",
+          statusColor:
+            row.status === "published"
+              ? "bg-green-100 text-green-800"
+              : row.status === "draft"
+              ? "bg-gray-100 text-gray-800"
+              : row.status === "paused"
+              ? "bg-yellow-100 text-yellow-800"
+              : "bg-red-100 text-red-800",
+          createdDate: new Date(row.created_at).toLocaleDateString("ja-JP", {
+            year: "numeric",
+            month: "numeric",
+            day: "numeric",
+          }),
+          originalCreatedAt: row.created_at,
+          publishedDate: row.publish_date
+            ? new Date(row.publish_date).toLocaleDateString("ja-JP")
+            : "",
+          expiryDate: row.expires_date
+            ? new Date(row.expires_date).toLocaleDateString("ja-JP")
+            : "",
+          location: row.location ?? "未設定",
+          salary: row.salary_text ?? "-",
+          workType: row.work_type ?? "-",
+          applications: row.applications_count ?? 0,
+          views: row.views_count ?? 0,
+          interviews: row.interviews_count ?? 0,
+          hires: row.hires_count ?? 0,
+          conversionRate:
+            row.views_count && row.views_count > 0
+              ? Math.round((row.hires_count / row.views_count) * 1000) / 10
+              : 0,
+          tags: tagArray,
+          is_urgent: row.is_urgent,
+        }
+      })
     )
 
     // ------ aggregate stats ------
@@ -278,9 +319,9 @@ export default function JobsPage() {
   const sortedJobs = [...filteredJobs].sort((a, b) => {
     switch (sortBy) {
       case "created_desc":
-        return new Date(b.createdDate).getTime() - new Date(a.createdDate).getTime()
+        return new Date(b.originalCreatedAt).getTime() - new Date(a.originalCreatedAt).getTime()
       case "created_asc":
-        return new Date(a.createdDate).getTime() - new Date(b.createdDate).getTime()
+        return new Date(a.originalCreatedAt).getTime() - new Date(b.originalCreatedAt).getTime()
       case "applications_desc":
         return b.applications - a.applications
       case "applications_asc":
@@ -516,7 +557,7 @@ export default function JobsPage() {
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-2">
                           <h3 className="font-semibold text-lg">{job.title}</h3>
-                          {job.isUrgent && <Badge className="bg-red-500 text-white text-xs px-2 py-1">急募</Badge>}
+                          {job.is_urgent && <Badge className="bg-red-500 text-white text-xs px-2 py-1">急募</Badge>}
                           <Badge className={job.statusColor}>
                             {getStatusIcon(job.status)}
                             <span className="ml-1">{job.statusLabel}</span>
@@ -541,11 +582,13 @@ export default function JobsPage() {
                         </div>
 
                         <div className="flex flex-wrap gap-2 mb-3">
-                          {job.tags.map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-xs">
-                              {tag}
-                            </Badge>
-                          ))}
+                          {Array.isArray(job.tags) &&
+                            job.tags.length > 0 &&
+                            job.tags.map((tag: string) => (
+                              <Badge key={tag} variant="secondary" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
                         </div>
 
                         <div className="grid grid-cols-5 gap-4">

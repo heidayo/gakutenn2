@@ -24,23 +24,25 @@ import {
   Trash2,
   Archive,
 } from "lucide-react"
-import Link from "next/link"
+import { useRouter, useParams } from 'next/navigation';
 import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase/client";
 
-export default function EditJobPage({ params }: { params: { id: string } }) {
+export default function EditJobPage() {
+  const { id } = useParams();
   const [formData, setFormData] = useState({
     // 基本情報
     title: "",
     category: "",
     description: "",
-    responsibilities: [],
-    requirements: [],
+    responsibilities: [] as string[],
+    requirements: [] as string[],
 
     // 勤務条件
     location: "",
     salary: "",
     salaryType: "hourly",
-    workDays: [],
+    workDays: [] as string[],
     workHours: "",
     duration: "",
     startDate: "",
@@ -51,13 +53,13 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
     frequency: "",
 
     // 待遇・福利厚生
-    benefits: [],
+    benefits: [] as string[],
 
     // 選考フロー
     selectionSteps: [
       { title: "書類選考", duration: "3日以内", description: "" },
       { title: "オンライン面談", duration: "1週間以内", description: "" },
-    ],
+    ] as { title: string; duration: string; description: string }[],
 
     // 企業・メンター情報
     mentorName: "",
@@ -68,72 +70,99 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
     // 公開設定
     status: "draft",
     publishDate: "",
-    tags: [],
+    tags: [] as string[],
   })
 
   const [currentTab, setCurrentTab] = useState("basic")
-  const [errors, setErrors] = useState({})
+  const [errors, setErrors] = useState<{ [key: string]: string }>({})
   const [jobStats, setJobStats] = useState({
     views: 0,
     applications: 0,
     interviews: 0,
   })
+  const router = useRouter();
 
   // 既存の求人データを読み込み
   useEffect(() => {
-    // 実際の実装では API から求人データを取得
-    const existingJob = {
-      title: "Webマーケティングアシスタント",
-      category: "マーケティング",
-      description:
-        "急成長中のスタートアップで、Webマーケティングの実務経験を積みませんか？データ分析からSNS運用まで、幅広いマーケティング業務を経験できます。",
-      responsibilities: [
-        "Google Analytics等を使用したWebサイトのデータ分析",
-        "SNSアカウント（Instagram、Twitter）の運用サポート",
-        "マーケティング資料の作成（PowerPoint、Excel使用）",
-      ],
-      requirements: ["大学1〜3年生", "Excel、PowerPointの基本操作ができる方", "SNSを日常的に使用している方"],
-      location: "東京都渋谷区",
-      salary: "1200",
-      salaryType: "hourly",
-      workDays: ["monday", "wednesday", "friday"],
-      workHours: "10:00-18:00（応相談）",
-      duration: "1ヶ月〜3ヶ月",
-      remote: true,
-      remoteDetails: "週1回出社必須",
-      frequency: "週1回〜3回",
-      benefits: ["交通費全額支給", "リモートワーク可", "実務経験証明書の発行"],
-      mentorName: "田中 マネージャー",
-      mentorRole: "マーケティング部門責任者",
-      mentorExperience: "マーケティング歴8年",
-      mentorMessage: "未経験でも大歓迎！一緒に成長していきましょう。",
-      status: "published",
-      tags: ["未経験歓迎", "週1OK", "リモート可"],
-      selectionSteps: [
-        { title: "書類選考", duration: "3日以内", description: "" },
-        { title: "オンライン面談", duration: "1週間以内", description: "" },
-      ],
+    if (!id || Array.isArray(id)) {
+      console.error("Invalid job id:", id);
+      return;
     }
-
-    setFormData({
-      ...existingJob,
-      responsibilities: existingJob.responsibilities || [],
-      requirements: existingJob.requirements || [],
-      benefits: existingJob.benefits || [],
-      tags: existingJob.tags || [],
-      workDays: existingJob.workDays || [],
-      selectionSteps: existingJob.selectionSteps || [
-        { title: "書類選考", duration: "3日以内", description: "" },
-        { title: "オンライン面談", duration: "1週間以内", description: "" },
-      ],
-    })
-
-    setJobStats({
-      views: 245,
-      applications: 12,
-      interviews: 8,
-    })
-  }, [params.id])
+    const jobId = id;
+    const fetchJob = async () => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select(`
+          id,
+         title,
+         category,
+         description,
+         responsibilities,
+         requirements,
+         location,
+         salary,
+         salary_type,
+         work_days,
+         work_hours,
+         duration,
+         start_date,
+         remote,
+         remote_details,
+         frequency,
+         benefits,
+         selection_steps,
+         mentor_name,
+         mentor_role,
+         mentor_experience,
+         mentor_message,
+         status,
+         publish_date,
+         tags,
+         created_at,
+         updated_at,
+         search_vector
+         `)
+        .eq('id', jobId)
+        .single();
+      if (error) {
+        console.error('Error fetching job:', error);
+      } else if (data) {
+        setFormData({
+          title: data.title,
+          category: data.category,
+          description: data.description,
+          responsibilities: data.responsibilities || [],
+          requirements: data.requirements || [],
+          location: data.location ?? "",
+          salary: data.salary != null ? String(data.salary) : "",
+          salaryType: data.salary_type ?? formData.salaryType,
+          workDays: data.work_days || [],
+          workHours: data.work_hours ?? "",
+          duration: data.duration ?? "",
+          startDate: data.start_date ?? "",
+          remote: data.remote ?? false,
+          remoteDetails: data.remote_details ?? "",
+          frequency: data.frequency ?? "",
+          benefits: data.benefits || [],
+          selectionSteps: (Array.isArray(data.selection_steps)
+            ? data.selection_steps.map((step) => ({
+                title: String((step as any).title || ""),
+                duration: String((step as any).duration || ""),
+                description: String((step as any).description || ""),
+              }))
+            : []) as { title: string; duration: string; description: string }[],
+          mentorName: data.mentor_name ?? "",
+          mentorRole: data.mentor_role ?? "",
+          mentorExperience: data.mentor_experience ?? "",
+          mentorMessage: data.mentor_message ?? "",
+          status: data.status ?? "draft",
+          publishDate: data.publish_date ?? "",
+          tags: data.tags || [],
+        });
+      }
+    };
+    fetchJob();
+  }, [id]);
 
   const categories = [
     "マーケティング",
@@ -171,24 +200,33 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
     "短期OK",
   ]
 
-  const handleArrayFieldAdd = (field: string) => {
+  type ArrayFieldKey =
+    | 'responsibilities'
+    | 'requirements'
+    | 'benefits'
+    | 'workDays'
+    | 'selectionSteps';
+
+  const handleArrayFieldAdd = (field: ArrayFieldKey) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: [...prev[field], ""],
+      [field]: [...((prev[field] as any[]) || []), ""],
     }))
   }
 
-  const handleArrayFieldRemove = (field: string, index: number) => {
+  const handleArrayFieldRemove = (field: ArrayFieldKey, index: number) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: prev[field].filter((_, i) => i !== index),
+      [field]: ((prev[field] as any[]) || []).filter((_, i) => i !== index),
     }))
   }
 
-  const handleArrayFieldChange = (field: string, index: number, value: string) => {
+  const handleArrayFieldChange = (field: ArrayFieldKey, index: number, value: string) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: prev[field].map((item, i) => (i === index ? value : item)),
+      [field]: ((prev[field] as any[]) || []).map((item, i) =>
+        i === index ? value : item
+      ),
     }))
   }
 
@@ -224,7 +262,7 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
 
   const handleSave = (status: string) => {
     // バリデーション
-    const newErrors = {}
+    const newErrors: { [key: string]: string } = {}
     if (!formData.title) newErrors.title = "職種名は必須です"
     if (!formData.category) newErrors.category = "カテゴリは必須です"
     if (!formData.description) newErrors.description = "業務内容は必須です"
@@ -245,16 +283,26 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
   }
 
   const handleDelete = () => {
+    if (!id || Array.isArray(id)) {
+      console.error("Invalid job id:", id);
+      return;
+    }
+    const jobId = id;
     if (confirm("この求人を削除しますか？この操作は取り消せません。")) {
-      console.log("Deleting job:", params.id)
+      console.log("Deleting job:", jobId)
       alert("求人を削除しました")
       // 求人一覧に戻る
     }
   }
 
   const handleArchive = () => {
+    if (!id || Array.isArray(id)) {
+      console.error("Invalid job id:", id);
+      return;
+    }
+    const jobId = id;
     if (confirm("この求人をアーカイブしますか？")) {
-      console.log("Archiving job:", params.id)
+      console.log("Archiving job:", jobId)
       alert("求人をアーカイブしました")
     }
   }
@@ -276,15 +324,12 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
       <header className="bg-white border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link href="/company/jobs">
-              <Button variant="ghost" size="sm">
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                求人一覧に戻る
-              </Button>
-            </Link>
+            <Button variant="ghost" size="sm" onClick={() => router.push('/company/jobs')}>
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              求人一覧に戻る
+            </Button>
             <div>
               <h1 className="text-2xl font-bold">求人編集</h1>
-              <p className="text-sm text-gray-600">ID: {params.id} | 最終更新: 2024年6月1日 14:30</p>
             </div>
           </div>
           <div className="flex items-center space-x-3">
@@ -508,7 +553,7 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
                           <Checkbox
                             id={day.id}
                             checked={formData.workDays.includes(day.id)}
-                            onCheckedChange={(checked) => handleWorkDayChange(day.id, checked)}
+                            onCheckedChange={(state) => handleWorkDayChange(day.id, state === true)}
                           />
                           <Label htmlFor={day.id} className="text-sm">
                             {day.label}
@@ -523,7 +568,9 @@ export default function EditJobPage({ params }: { params: { id: string } }) {
                       <Checkbox
                         id="remote"
                         checked={formData.remote}
-                        onCheckedChange={(checked) => setFormData((prev) => ({ ...prev, remote: checked }))}
+                        onCheckedChange={(state) =>
+                          setFormData((prev) => ({ ...prev, remote: state === true }))
+                        }
                       />
                       <Label htmlFor="remote">リモートワーク可能</Label>
                     </div>
