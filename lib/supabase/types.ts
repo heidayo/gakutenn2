@@ -9,6 +9,47 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      applications: {
+        Row: {
+          additional_info: string | null
+          agree_terms: boolean
+          available_days: string[]
+          created_at: string
+          id: string
+          job_id: string
+          start_date: string
+          user_id: string
+        }
+        Insert: {
+          additional_info?: string | null
+          agree_terms?: boolean
+          available_days: string[]
+          created_at?: string
+          id?: string
+          job_id: string
+          start_date: string
+          user_id: string
+        }
+        Update: {
+          additional_info?: string | null
+          agree_terms?: boolean
+          available_days?: string[]
+          created_at?: string
+          id?: string
+          job_id?: string
+          start_date?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "applications_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           address: string | null
@@ -53,38 +94,6 @@ export type Database = {
           website?: string | null
         }
         Relationships: []
-      }
-      company_members: {
-        Row: {
-          company_id: string | null
-          created_at: string | null
-          id: string
-          role: string | null
-          user_id: string | null
-        }
-        Insert: {
-          company_id?: string | null
-          created_at?: string | null
-          id?: string
-          role?: string | null
-          user_id?: string | null
-        }
-        Update: {
-          company_id?: string | null
-          created_at?: string | null
-          id?: string
-          role?: string | null
-          user_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "company_members_company_id_fkey"
-            columns: ["company_id"]
-            isOneToOne: false
-            referencedRelation: "companies"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       feedback_templates: {
         Row: {

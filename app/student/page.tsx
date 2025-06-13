@@ -179,6 +179,25 @@ export default function StudentHomePage() {
   const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(1)
   const [favorites, setFavorites] = useState<number[]>([])
+  
+  // おすすめ求人データ
+  const [recommendedJobs, setRecommendedJobs] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchRecommended = async () => {
+      const { data, error } = await supabase
+        .from('jobs')
+        .select('*')
+        .order('publish_date', { ascending: false })
+        .limit(10)
+      if (error) {
+        console.error('Error fetching recommended jobs:', error)
+      } else {
+        setRecommendedJobs(data || [])
+      }
+    }
+    fetchRecommended()
+  }, [])
   // 検索バー用
   const [searchQuery, setSearchQuery] = useState("")
   // 入力中のテキスト（Enter で確定）
@@ -437,7 +456,7 @@ export default function StudentHomePage() {
         </div>
 
         <div className="grid grid-cols-2 gap-3">
-          {filteredJobs.map((job) => (
+          {recommendedJobs.map((job) => (
             <Link href={`/student/jobs/${job.id}`} key={job.id}>
               <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
                 <div className="relative">
@@ -476,7 +495,7 @@ export default function StudentHomePage() {
                     </div>
                   </div>
 
-                  <div className="text-lg font-bold text-green-600 mb-2">{job.salary}</div>
+                  <div className="text-lg font-bold text-green-600 mb-2">¥{job.salary}</div>
 
                   {job.isNew && <Badge className="bg-red-500 text-white text-xs px-1.5 py-0.5 mb-2">NEW</Badge>}
                 </CardContent>
