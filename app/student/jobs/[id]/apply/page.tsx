@@ -99,6 +99,10 @@ export default function JobApplicationPage({ params }: { params: { id: string } 
       return
     }
 
+    const availableDaysJapanese = formData.availableDays.map(dayId =>
+      weekDays.find(d => d.id === dayId)?.label ?? dayId
+    );
+
     // applications テーブルに挿入
     const { error } = await supabase
       .from("applications")
@@ -106,7 +110,7 @@ export default function JobApplicationPage({ params }: { params: { id: string } 
         {
           job_id: params.id,
           user_id: user.id,
-          available_days: formData.availableDays,
+          available_days: availableDaysJapanese,
           start_date: formData.startDate,
           additional_info: formData.additionalInfo,
           agree_terms: formData.agreeTerms,

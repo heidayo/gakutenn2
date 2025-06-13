@@ -15,69 +15,65 @@ import {
   MapPin,
 } from "lucide-react"
 import Link from "next/link"
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
-export default function ApplicationDetailPage({ params }: { params: { id: string } }) {
-  const application = {
-    id: 1,
-    company: "株式会社テックスタート",
-    role: "Webマーケティングアシスタント",
-    appliedDate: "2024年6月1日",
-    status: "面談予定",
-    statusColor: "bg-blue-100 text-blue-800",
-    progress: 50,
-    location: "東京都渋谷区",
-    salary: "時給1,200円",
-
-    selectionFlow: [
-      {
-        step: 1,
-        title: "書類選考",
-        status: "completed",
-        date: "2024年6月1日",
-        result: "通過",
-        feedback: "プロフィールと志望動機が非常に良く書けています。",
-      },
-      {
-        step: 2,
-        title: "オンライン面談",
-        status: "scheduled",
-        date: "2024年6月5日 14:00",
-        result: "",
-        feedback: "",
-      },
-      {
-        step: 3,
-        title: "体験勤務",
-        status: "pending",
-        date: "",
-        result: "",
-        feedback: "",
-      },
-      {
-        step: 4,
-        title: "最終結果",
-        status: "pending",
-        date: "",
-        result: "",
-        feedback: "",
-      },
-    ],
-
-    applicationData: {
-      motivation:
-        "データ分析に興味があり、実際のビジネスデータを扱う経験を積みたいと思い応募いたします。大学でマーケティングを学んでおり、理論と実践を結びつけたいと考えています。",
-      selfPR:
-        "大学のゼミでデータ分析プロジェクトを担当し、Excelを使った分析経験があります。また、SNSを日常的に使用しており、トレンドに敏感です。",
-      availableDays: ["月曜日", "水曜日", "金曜日"],
-      startDate: "2024年6月10日",
+export default async function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+  const cookieStore = (await (async () => cookies())());
+  const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
+    cookies: {
+      get:    (name: string) => cookieStore.get(name)?.value,
+      set:    () => {},
+      remove: () => {},
     },
+  });
 
-    interviewer: {
-      name: "田中 マネージャー",
-      role: "マーケティング部門責任者",
-      message: "面談でお会いできることを楽しみにしています。",
-    },
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    return <div className="p-6">このページを見るにはログインが必要です。</div>;
   }
+
+  // Await the dynamic route params in Next.js 15+
+  const { id } = await params;
+
+  // Fetch application with related job and company
+  const { data: application, error } = await supabase
+    .from("applications")
+    .select(`
+      id,
+      created_at,
+      status,
+      next_step,
+      next_date,
+      available_days,
+      start_date,
+      additional_info,
+      jobs!applications_job_id_fkey (
+        id,
+        title,
+        location,
+        salary,
+        salary_type,
+        companies!jobs_company_id_fkey (
+          id,
+          name
+        )
+      )
+    `)
+    .eq("user_id", session.user.id)
+    .eq("id", id)
+    .single();
+
+  if (error || !application) {
+    console.error(error);
+    return <div>データの取得に失敗しました。</div>;
+  }
+
+  // Supabase returns child relations as arrays; extract the first elements
+  const job = application.jobs?.[0];
+  const company = job?.companies?.[0];
 
   const getStepStatus = (status: string) => {
     switch (status) {
@@ -91,6 +87,16 @@ export default function ApplicationDetailPage({ params }: { params: { id: string
         return { icon: <AlertCircle className="h-5 w-5 text-gray-400" />, color: "bg-gray-100" }
     }
   }
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case "面談予定": return "bg-blue-100 text-blue-800";
+      case "書類選考中": return "bg-yellow-100 text-yellow-800";
+      case "合格": return "bg-green-100 text-green-800";
+      case "不合格": return "bg-red-100 text-red-800";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 pb-6">
@@ -107,103 +113,52 @@ export default function ApplicationDetailPage({ params }: { params: { id: string
       <div className="px-4 py-6 space-y-6">
         {/* Application Header */}
         <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex-1">
-                <div className="flex items-center space-x-2 mb-2">
-                  <Building2 className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">{application.company}</span>
-                </div>
-                <h1 className="text-xl font-bold mb-2">{application.role}</h1>
-                <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
-                  <div className="flex items-center space-x-1">
-                    <MapPin className="h-4 w-4" />
-                    <span>{application.location}</span>
-                  </div>
-                  <span>{application.salary}</span>
-                </div>
-                <div className="flex items-center space-x-1 text-xs text-gray-500">
-                  <Calendar className="h-3 w-3" />
-                  <span>応募日: {application.appliedDate}</span>
-                </div>
-              </div>
-              <Badge className={application.statusColor}>{application.status}</Badge>
+  <CardContent className="pt-6">
+    <Link href={`/student/jobs/${job?.id}`} className="block">
+      <div className="flex items-start justify-between mb-4 cursor-pointer">
+        <div className="flex-1">
+          {/* Company Name */}
+          <div className="flex items-center space-x-2 mb-2">
+            <Building2 className="h-4 w-4 text-gray-500" />
+            <span className="text-sm text-gray-600">
+              {company?.name}
+            </span>
+          </div>
+          {/* Job Title */}
+          <h1 className="text-xl font-bold mb-2">
+            {job?.title}
+          </h1>
+          <div className="flex items-center space-x-4 text-sm text-gray-600 mb-2">
+            <div className="flex items-center space-x-1">
+              <MapPin className="h-4 w-4" />
+              <span>{job?.location}</span>
             </div>
+            <span>
+              {job?.salary}
+              {(job?.salary_type === 'hourly' ? '円／時' : '円')}
+            </span>
+          </div>
+          <div className="flex items-center space-x-1 text-xs text-gray-500">
+            <Calendar className="h-3 w-3" />
+            <span>応募日: {new Date(application.created_at).toLocaleDateString('ja-JP')}</span>
+          </div>
+        </div>
+        <Badge className={getStatusColor(application.status)}>
+          {application.status}
+        </Badge>
+      </div>
+    </Link>
 
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="font-medium">選考進捗</span>
-                <span>{application.progress}%</span>
+                {/* Assuming progress is not fetched, so no progress shown */}
+                <span>0%</span>
               </div>
-              <Progress value={application.progress} className="h-2" />
+              <Progress value={0} className="h-2" />
             </div>
           </CardContent>
         </Card>
-
-        {/* Selection Flow */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">選考フロー</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {application.selectionFlow.map((step, index) => {
-                const stepStatus = getStepStatus(step.status)
-                return (
-                  <div key={index} className="flex items-start space-x-4">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${stepStatus.color}`}>
-                      {stepStatus.icon}
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center space-x-2 mb-1">
-                        <h4 className="font-semibold text-sm">{step.title}</h4>
-                        {step.result && (
-                          <Badge variant="outline" className="text-xs">
-                            {step.result}
-                          </Badge>
-                        )}
-                      </div>
-                      {step.date && <p className="text-xs text-gray-600 mb-1">{step.date}</p>}
-                      {step.feedback && (
-                        <div className="bg-blue-50 p-2 rounded text-xs text-gray-700">{step.feedback}</div>
-                      )}
-                      {step.status === "scheduled" && (
-                        <div className="mt-2">
-                          <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                            面談詳細を確認
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Interviewer Info */}
-        {application.interviewer && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">面接官情報</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-start space-x-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-blue-600 rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold">田</span>
-                </div>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-sm">{application.interviewer.name}</h4>
-                  <p className="text-xs text-gray-600 mb-2">{application.interviewer.role}</p>
-                  <div className="bg-blue-50 p-2 rounded">
-                    <p className="text-xs text-gray-700">"{application.interviewer.message}"</p>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
 
         {/* Application Data */}
         <Card>
@@ -211,18 +166,16 @@ export default function ApplicationDetailPage({ params }: { params: { id: string
             <CardTitle className="text-base">応募内容</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <h4 className="font-semibold text-sm mb-1">志望動機</h4>
-              <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">{application.applicationData.motivation}</p>
-            </div>
-            <div>
-              <h4 className="font-semibold text-sm mb-1">自己PR</h4>
-              <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">{application.applicationData.selfPR}</p>
-            </div>
+            {application.additional_info && (
+              <div>
+                <h4 className="font-semibold text-sm mb-1">追加情報</h4>
+                <p className="text-sm text-gray-700 bg-gray-50 p-2 rounded">{application.additional_info}</p>
+              </div>
+            )}
             <div>
               <h4 className="font-semibold text-sm mb-1">勤務可能曜日</h4>
               <div className="flex flex-wrap gap-1">
-                {application.applicationData.availableDays.map((day, index) => (
+                {application.available_days.map((day: string, index: number) => (
                   <Badge key={index} variant="outline" className="text-xs">
                     {day}
                   </Badge>
@@ -231,7 +184,7 @@ export default function ApplicationDetailPage({ params }: { params: { id: string
             </div>
             <div>
               <h4 className="font-semibold text-sm mb-1">勤務開始希望日</h4>
-              <p className="text-sm text-gray-700">{application.applicationData.startDate}</p>
+              <p className="text-sm text-gray-700">{new Date(application.start_date).toLocaleDateString('ja-JP')}</p>
             </div>
           </CardContent>
         </Card>

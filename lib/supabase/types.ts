@@ -14,33 +14,58 @@ export type Database = {
           additional_info: string | null
           agree_terms: boolean
           available_days: string[]
+          company_id: string | null
           created_at: string
           id: string
           job_id: string
+          name: string | null
+          next_date: string | null
+          next_step: string | null
           start_date: string
+          status: string
+          title: string | null
           user_id: string
         }
         Insert: {
           additional_info?: string | null
           agree_terms?: boolean
           available_days: string[]
+          company_id?: string | null
           created_at?: string
           id?: string
           job_id: string
+          name?: string | null
+          next_date?: string | null
+          next_step?: string | null
           start_date: string
+          status?: string
+          title?: string | null
           user_id: string
         }
         Update: {
           additional_info?: string | null
           agree_terms?: boolean
           available_days?: string[]
+          company_id?: string | null
           created_at?: string
           id?: string
           job_id?: string
+          name?: string | null
+          next_date?: string | null
+          next_step?: string | null
           start_date?: string
+          status?: string
+          title?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "applications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "applications_job_id_fkey"
             columns: ["job_id"]
@@ -437,153 +462,6 @@ export type Database = {
           year?: string | null
         }
         Relationships: []
-      }
-      student_diagnosis_results: {
-        Row: {
-          category: string
-          comment: string | null
-          created_at: string | null
-          id: number
-          score: number | null
-          student_id: string
-        }
-        Insert: {
-          category: string
-          comment?: string | null
-          created_at?: string | null
-          id?: never
-          score?: number | null
-          student_id: string
-        }
-        Update: {
-          category?: string
-          comment?: string | null
-          created_at?: string | null
-          id?: never
-          score?: number | null
-          student_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "student_diagnosis_results_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "student_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      student_experiences: {
-        Row: {
-          created_at: string | null
-          description: string | null
-          end_date: string | null
-          id: number
-          start_date: string | null
-          student_id: string
-          title: string
-        }
-        Insert: {
-          created_at?: string | null
-          description?: string | null
-          end_date?: string | null
-          id?: never
-          start_date?: string | null
-          student_id: string
-          title: string
-        }
-        Update: {
-          created_at?: string | null
-          description?: string | null
-          end_date?: string | null
-          id?: never
-          start_date?: string | null
-          student_id?: string
-          title?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "student_experiences_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "student_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      student_profiles: {
-        Row: {
-          completion_rate: number | null
-          created_at: string | null
-          email: string | null
-          faculty: string | null
-          first_name: string | null
-          id: string
-          last_name: string | null
-          phone: string | null
-          prefecture: string | null
-          university: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          completion_rate?: number | null
-          created_at?: string | null
-          email?: string | null
-          faculty?: string | null
-          first_name?: string | null
-          id: string
-          last_name?: string | null
-          phone?: string | null
-          prefecture?: string | null
-          university?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          completion_rate?: number | null
-          created_at?: string | null
-          email?: string | null
-          faculty?: string | null
-          first_name?: string | null
-          id?: string
-          last_name?: string | null
-          phone?: string | null
-          prefecture?: string | null
-          university?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
-      student_skills: {
-        Row: {
-          created_at: string | null
-          id: number
-          level: number | null
-          name: string
-          student_id: string
-        }
-        Insert: {
-          created_at?: string | null
-          id?: never
-          level?: number | null
-          name: string
-          student_id: string
-        }
-        Update: {
-          created_at?: string | null
-          id?: never
-          level?: number | null
-          name?: string
-          student_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "student_skills_student_id_fkey"
-            columns: ["student_id"]
-            isOneToOne: false
-            referencedRelation: "student_profiles"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       students: {
         Row: {

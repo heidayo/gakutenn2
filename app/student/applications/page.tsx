@@ -61,21 +61,24 @@ export default async function ApplicationsPage() {
     return <div className="p-6">このページを見るにはログインが必要です。</div>;
   }
 
-  // student_id は auth.user.id と一致している前提
   const { data: rawApps, error } = await supabase
-    .from("student_applications_view") // ★ビュー名は実環境に合わせて変更
+    .from("applications")
     .select(`
       id,
-      company:company_name,
-      role:job_title,
-      applied_date,
+      created_at,
       status,
       next_step,
       next_date,
-      progress
+      jobs!applications_job_id_fkey (
+        title,
+        companies!jobs_company_id_fkey (
+          name
+        )
+      )
     `)
-    .eq("student_id", session.user.id)
-    .order("applied_date", { ascending: false });
+    .eq("user_id", session.user.id)
+    .order("created_at", { ascending: false });
+  console.log("rawApps:", rawApps, "fetch error:", error);
 
   if (error) console.error("applications fetch error", error);
 
@@ -95,19 +98,28 @@ export default async function ApplicationsPage() {
     }
   };
 
-  const applications = (rawApps ?? []).map((row) => ({
-    ...row,
-    progress:
-      row.progress ??
-      (row.status === "合格" || row.status === "不合格"
-        ? 100
-        : row.status === "面談予定"
-        ? 50
-        : 25),
-    appliedDate: row.applied_date
-      ? new Date(row.applied_date).toLocaleDateString("ja-JP")
-      : "",
-  }));
+  const applications = (rawApps ?? []).map((row) => {
+    const job = row.jobs as any;
+    const companyObj = job?.companies as any;
+    return {
+      id: row.id,
+      company: companyObj?.name ?? "",
+      jobTitle: job?.title ?? "",
+      status: row.status,
+      next_step: row.next_step,
+      next_date: row.next_date,
+      progress:
+        row.status === "合格" || row.status === "不合格"
+          ? 100
+          : row.status === "面談予定"
+          ? 50
+          : 25,
+      appliedDate: row.created_at
+        ? new Date(row.created_at).toLocaleDateString("ja-JP")
+        : "",
+    };
+  });
+  console.log("applications:", applications);
 
   const stats = {
     total: applications.length,
@@ -192,11 +204,13 @@ export default async function ApplicationsPage() {
                 <CardContent className="p-4">
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex-1">
+                      {/* Company Name */}
                       <div className="flex items-center space-x-2 mb-1">
                         <Building2 className="h-4 w-4 text-gray-500" />
                         <span className="text-sm text-gray-600">{app.company}</span>
                       </div>
-                      <h3 className="font-semibold text-base mb-1">{app.role}</h3>
+                      {/* Job Title */}
+                      <h3 className="font-semibold text-base mb-1">{app.jobTitle}</h3>
                       <div className="flex items-center space-x-1 text-xs text-gray-500 mb-2">
                         <Calendar className="h-3 w-3" />
                         <span>応募日: {app.appliedDate}</span>
