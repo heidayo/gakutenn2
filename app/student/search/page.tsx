@@ -28,38 +28,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Checkbox } from "@/components/ui/checkbox"
 import { Slider } from "@/components/ui/slider"
 
-// モックデータ
-const mockJobs = Array.from({ length: 100 }, (_, i) => ({
-  id: i + 1,
-  title: `${["フロントエンド", "バックエンド", "デザイナー", "マーケティング", "データ分析"][i % 5]}インターン`,
-  company: `株式会社${["テック", "イノベーション", "クリエイト", "グロース", "フューチャー"][i % 5]}`,
-  location: ["東京都", "大阪府", "リモート", "神奈川県", "愛知県"][i % 5],
-  salary: `時給 ${1000 + (i % 10) * 200}円`,
-  period: ["アルバイト", "インターン"][i % 2],
-  industry: ["IT・Web", "金融", "小売・EC", "製造業", "サービス業"][i % 5],
-  jobType: ["エンジニア", "デザイナー", "営業", "マーケティング", "企画", "人事", "カスタマーサポート", "経理・財務"][
-    i % 8
-  ],
-  benefits: [
-    i % 3 === 0 ? "交通費支給" : null,
-    i % 4 === 0 ? "昇給あり" : null,
-    i % 5 === 0 ? "社会保険完備" : null,
-    i % 6 === 0 ? "研修制度" : null,
-  ].filter(Boolean),
-  timeSlot: ["朝（9:00-12:00）", "昼（12:00-18:00）", "夕方（18:00-21:00）", "夜間（21:00-24:00）"][i % 4],
-  remote: i % 3 === 0,
-  tags: [
-    i % 4 === 0 ? "週1OK" : null,
-    i % 3 === 0 ? "未経験歓迎" : null,
-    i % 5 === 0 ? "リモート可" : null,
-    i % 6 === 0 ? "高時給" : null,
-  ].filter(Boolean),
-  matchScore: Math.floor(Math.random() * 5) + 1,
-  isPopular: i % 7 === 0,
-  postedAt: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000),
-  saved: false,
-  image: `/placeholder.svg?height=180&width=320&query=job-${i}`,
-}))
+import { supabase } from "@/lib/supabase/client"
+import { Database } from "@/lib/supabase/types"
+
+
+type Job = Omit<Database["public"]["Tables"]["jobs"]["Row"], "search_vector">
 
 // クイックタグ
 const quickTags = [
@@ -79,15 +52,53 @@ const sortOptions = [
 ]
 
 export default function SearchPage() {
+  const [jobs, setJobs] = useState<Job[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [sortBy, setSortBy] = useState("newest")
   const [displayedJobs, setDisplayedJobs] = useState(20)
-  const [savedJobs, setSavedJobs] = useState<Set<number>>(new Set())
+  const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set())
+  // 時給レンジ
+  const [hourlyRange, setHourlyRange] = useState<[number, number]>([1000, 3000])
+
+  // デバッグ: jobsテーブルのIDを取得してログ出力
+  useEffect(() => {
+    supabase
+      .from("jobs")
+      .select("id")
+      .then(({ data, error }) => {
+        console.log("jobs data:", data, " error:", error)
+      })
+  }, [])
+
+  useEffect(() => {
+    supabase
+      .from("jobs")
+      .select("*")
+      .then(({ data, error }) => {
+        console.log("jobs fetch →", { data, error })
+        if (error) {
+          console.error("Error fetching jobs:", error)
+        } else {
+          setJobs(data || [])
+        }
+      })
+  }, [])
+
+  // 取りうるセクション名の型
+  type SectionKey =
+    | "salary"
+    | "period"
+    | "jobType"
+    | "location"
+    | "industry"
+    | "benefits"
+    | "hashtags"
+    | "remote"
 
   // フィルタ状態
   const [filters, setFilters] = useState({
-    salary: [1000, 3000],
+    salary:  [] as string[],
     period: [] as string[],
     location: [] as string[],
     industry: [] as string[],
@@ -96,9 +107,10 @@ export default function SearchPage() {
     hashtags: [] as string[], // ハッシュタグフィルタを追加
     remote: false,
   })
+  
 
   // フィルタの展開状態
-  const [expandedSections, setExpandedSections] = useState({
+  const [expandedSections, setExpandedSections] = useState<Record<SectionKey, boolean>>({
     salary: false,
     period: false,
     jobType: false,
@@ -110,7 +122,7 @@ export default function SearchPage() {
   })
 
   // セクション展開切り替え関数
-  const toggleSection = (section: string) => {
+  const toggleSection = (section: SectionKey) => {
     setExpandedSections((prev) => ({
       ...prev,
       [section]: !prev[section],
@@ -123,7 +135,7 @@ export default function SearchPage() {
   }, [])
 
   // 求人保存処理
-  const toggleSaveJob = useCallback((jobId: number) => {
+  const toggleSaveJob = useCallback((jobId: string) => {
     setSavedJobs((prev) => {
       const newSet = new Set(prev)
       if (newSet.has(jobId)) {
@@ -137,58 +149,65 @@ export default function SearchPage() {
 
   // フィルタリング＆ソート処理
   const filteredAndSortedJobs = useMemo(() => {
-    const filtered = mockJobs.filter((job) => {
+    const filtered = jobs.filter((job) => {
       // 検索クエリフィルタ
       if (
         searchQuery &&
         !job.title.toLowerCase().includes(searchQuery.toLowerCase()) &&
-        !job.company.toLowerCase().includes(searchQuery.toLowerCase())
+        !job.category.toLowerCase().includes(searchQuery.toLowerCase())
       ) {
         return false
       }
 
       // タグフィルタ
       if (selectedTags.length > 0) {
-        const hasSelectedTag = selectedTags.some((tag) => job.tags.includes(tag))
+        const hasSelectedTag = selectedTags.some((tag) => (job.tags || []).includes(tag))
         if (!hasSelectedTag) return false
       }
 
-      // 報酬フィルタ
-      const jobSalary = Number.parseInt(job.salary.match(/\d+/)?.[0] || "0")
-      if (jobSalary < filters.salary[0] || jobSalary > filters.salary[1]) {
-        return false
+      // 報酬体系フィルタ
+      if (filters.salary.length > 0) {
+        const type = job.salary_type
+        if (!type || !filters.salary.includes(type)) {
+          return false
+        }
       }
 
       // 期間フィルタ
-      if (filters.period.length > 0 && !filters.period.includes(job.period)) {
-        return false
+      if (filters.period.length > 0) {
+        const dur = job.duration
+        if (!dur || !filters.period.includes(dur)) {
+          return false
+        }
       }
 
       // 勤務地フィルタ
-      if (filters.location.length > 0 && !filters.location.includes(job.location)) {
-        return false
+      if (filters.location.length > 0) {
+        const loc = job.location
+        if (!loc || !filters.location.includes(loc)) {
+          return false
+        }
       }
 
       // 業種フィルタ
-      if (filters.industry.length > 0 && !filters.industry.includes(job.industry)) {
+      if (filters.industry.length > 0 && !filters.industry.includes(job.category)) {
         return false
       }
 
       // 職種フィルタ
-      if (filters.jobType.length > 0 && !filters.jobType.includes(job.jobType)) {
+      if (filters.jobType.length > 0 && !filters.jobType.some((t) => (job.tags || []).includes(t))) {
         return false
       }
 
       // 待遇フィルタ
       if (filters.benefits.length > 0) {
-        const hasBenefit = filters.benefits.some((benefit) => job.benefits.includes(benefit))
+        const hasBenefit = filters.benefits.some((benefit) => (job.benefits || []).includes(benefit))
         if (!hasBenefit) return false
       }
 
-
       // ハッシュタグフィルタ
       if (filters.hashtags.length > 0) {
-        const hasHashtag = filters.hashtags.some((hashtag) => job.tags.includes(hashtag))
+        const hasHashtag = filters.hashtags.some((hashtag) => (job.tags || []).includes(hashtag))
         if (!hasHashtag) return false
       }
 
@@ -203,19 +222,18 @@ export default function SearchPage() {
     // ソート処理
     filtered.sort((a, b) => {
       switch (sortBy) {
-        case "newest":
-          return b.postedAt.getTime() - a.postedAt.getTime()
-        case "popular":
-          return (b.isPopular ? 1 : 0) - (a.isPopular ? 1 : 0)
-        case "match":
-          return b.matchScore - a.matchScore
+        case "newest": {
+          const bTime = b.publish_date ? new Date(b.publish_date).getTime() : 0
+          const aTime = a.publish_date ? new Date(a.publish_date).getTime() : 0
+          return bTime - aTime
+        }
         default:
           return 0
       }
     })
 
     return filtered
-  }, [searchQuery, selectedTags, sortBy, filters])
+  }, [jobs, searchQuery, selectedTags, sortBy, filters])
 
   // 無限スクロール
   useEffect(() => {
@@ -232,7 +250,7 @@ export default function SearchPage() {
   // フィルタリセット
   const resetFilters = () => {
     setFilters({
-      salary: [1000, 3000],
+      salary: [],
       period: [],
       location: [],
       industry: [],
@@ -253,7 +271,7 @@ export default function SearchPage() {
     (filters.benefits.length > 0 ? 1 : 0) +
     (filters.hashtags.length > 0 ? 1 : 0) +
     (filters.remote ? 1 : 0) +
-    (filters.salary[0] !== 1000 || filters.salary[1] !== 3000 ? 1 : 0) +
+    (filters.salary.length > 0 ? 1 : 0) +
     selectedTags.length
 
   // フィルタ項目の表示値を取得する関数
@@ -262,13 +280,9 @@ export default function SearchPage() {
       case "jobType":
         return filters.jobType.length > 0 ? filters.jobType.join(", ") : "すべて"
       case "salary":
-        return filters.salary[0] === 1000 && filters.salary[1] === 3000
-          ? "指定なし"
-          : `¥${filters.salary[0]} - ¥${filters.salary[1]}`
+        return filters.salary.length > 0 ? filters.salary.join(", ") : "指定なし"
       case "benefits":
         return filters.benefits.length > 0 ? filters.benefits.join(", ") : "指定なし"
-      case "excludeKeywords":
-        return filters.excludeKeywords.length > 0 ? filters.excludeKeywords.join(", ") : "指定なし"
       default:
         return "指定なし"
     }
@@ -328,30 +342,55 @@ export default function SearchPage() {
                   <SheetTitle>フィルタ設定</SheetTitle>
                 </SheetHeader>
                 <div className="py-4 space-y-4 overflow-y-auto max-h-[60vh]">
+                  
                   {/* 報酬フィルタ */}
                   <Collapsible open={expandedSections.salary} onOpenChange={() => toggleSection("salary")}>
                     <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                       <div className="flex items-center space-x-3">
                         <Yen className="h-5 w-5 text-gray-600" />
-                        <span className="text-sm font-medium">時給範囲</span>
+                        <span className="text-sm font-medium">給与体系</span>
                       </div>
-                      <ChevronDown
-                        className={`h-4 w-4 transition-transform ${expandedSections.salary ? "rotate-180" : ""}`}
-                      />
+                      <ChevronDown className={`h-4 w-4 transition-transform ${expandedSections.salary ? "rotate-180" : ""}`} />
                     </CollapsibleTrigger>
                     <CollapsibleContent className="px-3 pt-3">
-                      <Slider
-                        value={filters.salary}
-                        onValueChange={(value) => setFilters((prev) => ({ ...prev, salary: value }))}
-                        max={3000}
-                        min={1000}
-                        step={100}
-                        className="w-full"
-                      />
-                      <div className="flex justify-between text-xs text-gray-500 mt-1">
-                        <span>¥{filters.salary[0]}</span>
-                        <span>¥{filters.salary[1]}</span>
+                      <div className="space-y-2">
+                        {["時給", "歩合"].map((type) => (
+                          <div key={type} className="flex items-center space-x-2">
+                            <Checkbox
+                              id={`salary-${type}`}
+                              checked={filters.salary.includes(type)}
+                              onCheckedChange={(checked) =>
+                                setFilters((prev) => ({
+                                  ...prev,
+                                  salary: checked
+                                    ? [...prev.salary, type]
+                                    : prev.salary.filter((s) => s !== type),
+                                }))
+                              }
+                            />
+                            <label htmlFor={`salary-${type}`} className="text-sm">
+                              {type}
+                            </label>
+                          </div>
+                        ))}
                       </div>
+                      {filters.salary.includes("時給") && (
+                        <div className="mt-4">
+                          <span className="text-xs text-gray-500">時給範囲</span>
+                          <Slider
+                            value={hourlyRange}
+                            onValueChange={(value) => setHourlyRange(value as [number, number])}
+                            min={500}
+                            max={5000}
+                            step={100}
+                            className="w-full mt-2"
+                          />
+                          <div className="flex justify-between text-xs text-gray-500 mt-1">
+                            <span>¥{hourlyRange[0]}</span>
+                            <span>¥{hourlyRange[1]}</span>
+                          </div>
+                        </div>
+                      )}
                     </CollapsibleContent>
                   </Collapsible>
 
@@ -670,12 +709,12 @@ export default function SearchPage() {
               <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
                 <div className="relative aspect-[16/9] overflow-hidden">
                   <img
-                    src={job.image || "/placeholder.svg"}
+                    src="/placeholder.svg"
                     alt={job.title}
                     className="w-full h-full object-cover transition-transform hover:scale-105 duration-300"
                     loading="lazy"
                   />
-                  {Math.floor((Date.now() - job.postedAt.getTime()) / (1000 * 60 * 60 * 24)) < 3 && (
+                  {job.publish_date && Math.floor((Date.now() - new Date(job.publish_date).getTime()) / (1000 * 60 * 60 * 24)) < 3 && (
                     <Badge className="absolute top-2 left-2 bg-red-500 text-white text-xs px-1.5 py-0.5">NEW</Badge>
                   )}
                   {/* Bookmark */}
@@ -704,7 +743,7 @@ export default function SearchPage() {
                   <div className="space-y-1 text-xs text-gray-600 mb-2">
                     <div className="flex items-center space-x-1">
                       <Clock className="h-3 w-3" />
-                      <span>{job.timeSlot}</span>
+                      <span>{job.work_hours}</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <MapPin className="h-3 w-3" />
@@ -712,9 +751,10 @@ export default function SearchPage() {
                     </div>
                   </div>
 
-                  <div className="text-lg font-bold text-green-600 mb-2">{job.salary}</div>
+                  <div className="text-lg font-bold text-green-600 mb-2">
+                    ¥{job.salary}
+                  </div>
 
-                  {job.isPopular && <Badge className="bg-red-500 text-white text-xs px-1.5 py-0.5 mb-2">人気</Badge>}
                 </CardContent>
               </Card>
             </Link>

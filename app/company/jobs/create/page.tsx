@@ -568,13 +568,15 @@ export default function CreateJobPage() {
                     <div className="space-y-2">
                       <Label>給与</Label>
                       <div className="flex space-x-2">
-                        <Input
-                          type="number"
-                          value={formData.salary}
-                          onChange={(e) => setFormData((prev) => ({ ...prev, salary: e.target.value }))}
-                          placeholder="1200"
-                          className="flex-1"
-                        />
+                        {formData.salaryType !== 'commission' && (
+                          <Input
+                            type="number"
+                            value={formData.salary}
+                            onChange={(e) => setFormData((prev) => ({ ...prev, salary: e.target.value }))}
+                            placeholder="1200"
+                            className="flex-1"
+                          />
+                        )}
                         <Select
                           value={formData.salaryType}
                           onValueChange={(value) => setFormData((prev) => ({ ...prev, salaryType: value }))}
@@ -585,7 +587,7 @@ export default function CreateJobPage() {
                           <SelectContent className="z-[9999] bg-white border shadow-lg">
                             <SelectItem value="hourly">時給</SelectItem>
                             <SelectItem value="daily">日給</SelectItem>
-                            <SelectItem value="monthly">月給</SelectItem>
+                            <SelectItem value="commission">歩合</SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
