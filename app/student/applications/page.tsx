@@ -100,7 +100,7 @@ export default async function ApplicationsPage() {
 
   const applications = (rawApps ?? []).map((row) => {
     const job = row.jobs as any;
-    const companyObj = job?.companies as any;
+    const companyObj = job.companies as any;
     return {
       id: row.id,
       company: companyObj?.name ?? "",
