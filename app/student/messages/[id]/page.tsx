@@ -1,5 +1,20 @@
 "use client"
 
+import { useEffect } from "react"
+import { supabase } from "@/lib/supabase/client"
+
+/** Local type for rows from company_chat_rooms_view */
+type CompanyChatRoom = {
+  application_id: string | null
+  application_status: string | null
+  chat_room_id: string | null
+  job_title: string | null
+  company_name: string | null
+  last_message: string | null
+  last_message_at: string | null
+  unread_count: number | null
+}
+
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card } from "@/components/ui/card"
@@ -33,64 +48,141 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   const [showScheduleDialog, setShowScheduleDialog] = useState(false)
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
 
-  const company = {
-    name: "株式会社テックスタート",
-    logo: "T",
-    status: "面談調整中",
+  const [chatRooms, setChatRooms] = useState<CompanyChatRoom[]>([])
+  const [loading, setLoading] = useState<boolean>(true)
+  const [applicationId, setApplicationId] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function fetchChatRooms() {
+      setLoading(true)
+      const { data: room, error } = await supabase
+        .from('chat_rooms')
+        .select(`
+          id,
+          application_id,
+          created_at,
+          applications!chat_rooms_application_id_fkey (
+            status,
+            companies!applications_company_id_fkey (
+              name
+            ),
+            jobs!applications_job_id_fkey (
+              title
+            )
+          )
+        `)
+        .eq('id', Number(params.id))
+        .single()
+
+      if (error || !room) {
+        console.error('chat rooms fetch error:', error)
+      } else {
+        setApplicationId(room.application_id)
+        setChatRooms([{
+          chat_room_id: room.id.toString(),
+          application_id: room.application_id,
+          application_status: room.applications?.status ?? null,
+          company_name: room.applications?.companies?.name ?? "",
+          job_title: room.applications?.jobs?.title ?? "",
+          last_message: "",    // placeholder
+          last_message_at: "", // placeholder
+          unread_count: null,  // placeholder
+        }])
+      }
+      setLoading(false)
+    }
+
+    fetchChatRooms()
+  }, [params.id])
+
+  /** Local type for rows from messages table */
+  type MessageRow = {
+    id: string
+    application_id: string
+    content: string
+    created_at: string
+    is_read: boolean
+    sender: string
+    type: string
   }
 
-  const messages = [
-    {
-      id: 1,
-      sender: "company",
-      content: "この度は弊社の求人にご応募いただき、ありがとうございます。",
-      timestamp: "10:30",
-      isRead: true,
-      type: "text",
-    },
-    {
-      id: 2,
-      sender: "company",
-      content: "書類選考の結果、面談をさせていただきたく思います。",
-      timestamp: "10:31",
-      isRead: true,
-      type: "text",
-    },
-    {
-      id: 3,
-      sender: "student",
-      content: "ありがとうございます！ぜひよろしくお願いいたします。",
-      timestamp: "11:15",
-      isRead: true,
-      type: "text",
-    },
-    {
-      id: 4,
-      sender: "company",
-      content: "面談の件でご連絡いたします。来週の火曜日14:00はいかがでしょうか？",
-      timestamp: "14:30",
-      isRead: false,
-      type: "text",
-    },
-    {
-      id: 5,
-      sender: "company",
-      content: "",
-      timestamp: "14:31",
-      isRead: false,
-      type: "file",
-      fileName: "面談資料.pdf",
-      fileSize: "2.3MB",
-    },
-  ]
+  useEffect(() => {
+    async function fetchMessages() {
+      // chat_rooms テーブルから application_id を取得
+      const { data: room, error: roomError } = await supabase
+        .from('chat_rooms')
+        .select('application_id')
+        .eq('id', Number(params.id))
+        .single()
+
+      if (roomError || !room) {
+        console.error('chat room fetch error:', roomError)
+        return
+      }
+      const applicationId = room.application_id
+      setApplicationId(applicationId)
+
+      // messages テーブルからメッセージを取得
+      const { data, error } = await supabase
+        .from('messages')
+        .select('*')
+        .eq('application_id', applicationId)
+        .order('created_at', { ascending: true })
+
+      if (error) {
+        console.error('messages fetch error:', error)
+      } else if (data) {
+        setMessagesData(data as MessageRow[])
+      }
+    }
+    fetchMessages()
+  }, [params.id])
+
+  useEffect(() => {
+    if (!applicationId) return
+    const channel = supabase
+      .channel('public:messages')
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'messages', filter: `application_id=eq.${applicationId}` },
+        (payload) => {
+          setMessagesData((prev) => [...prev, payload.new as MessageRow])
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, [applicationId])
+
+  const [messagesData, setMessagesData] = useState<MessageRow[]>([])
+
+  // Derive company and job info from chatRooms
+  const currentRoom = chatRooms[0] || {};
+  const companyName = currentRoom.company_name ?? "";
+  const jobTitle = currentRoom.job_title ?? "";
+  const companyLogo = companyName.charAt(0) ?? "";
+  const companyStatus = currentRoom.application_status ?? "";
 
   const timeSlots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"]
 
-  const handleSendMessage = () => {
-    if (message.trim()) {
-      // メッセージ送信処理
-      console.log("Sending message:", message)
-      setMessage("")
+  const handleSendMessage = async () => {
+    if (!message.trim() || !applicationId) return
+    const { error } = await supabase
+      .from('messages')
+      .insert({
+        application_id: applicationId,
+        content: message.trim(),
+        sender: 'student',
+        type: 'text',
+        is_read: false,
+        created_at: new Date().toISOString(),
+      })
+    if (error) {
+      console.error('message send error:', error)
+    } else {
+      setMessage('')
     }
   }
 
@@ -119,16 +211,18 @@ export default function ChatPage({ params }: { params: { id: string } }) {
             </Link>
             <div className="flex items-center space-x-3">
               <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">{company.logo}</span>
+                <span className="text-white font-bold text-sm">{companyLogo}</span>
               </div>
               <div>
                 <div className="flex items-center space-x-2">
                   <Building2 className="h-4 w-4 text-gray-500" />
-                  <span className="font-semibold text-sm">{company.name}</span>
+                  <span className="font-semibold text-sm">{companyName}</span>
                 </div>
                 <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 mt-1">
-                  {company.status}
+                  {companyStatus}
                 </Badge>
+                {/* Optionally display job title */}
+                <div className="text-xs text-gray-600 mt-1">{jobTitle}</div>
               </div>
             </div>
           </div>
@@ -148,7 +242,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
-        {messages.map((msg) => (
+        {messagesData.map((msg) => (
           <div key={msg.id} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[80%] ${msg.sender === "student" ? "order-2" : "order-1"}`}>
               {msg.type === "text" ? (
@@ -168,8 +262,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
                       <FileText className="h-5 w-5 text-red-600" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-semibold">{msg.fileName}</p>
-                      <p className="text-xs text-gray-500">{msg.fileSize}</p>
+                      <p className="text-sm font-semibold">{msg.content}</p>
                     </div>
                     <Button variant="ghost" size="sm">
                       <Download className="h-4 w-4" />
@@ -178,10 +271,12 @@ export default function ChatPage({ params }: { params: { id: string } }) {
                 </Card>
               )}
               <div className={`flex items-center space-x-1 mt-1 ${msg.sender === "student" ? "justify-end" : ""}`}>
-                <span className="text-xs text-gray-500">{msg.timestamp}</span>
+                <span className="text-xs text-gray-500">
+                  {new Date(msg.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}
+                </span>
                 {msg.sender === "student" && (
                   <div className="flex items-center">
-                    {msg.isRead ? (
+                    {msg.is_read ? (
                       <CheckCheck className="h-3 w-3 text-blue-500" />
                     ) : (
                       <Clock className="h-3 w-3 text-gray-400" />

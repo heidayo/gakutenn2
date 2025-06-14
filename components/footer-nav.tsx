@@ -21,6 +21,7 @@ const items = [
   { href: "/student/profile", icon: User, label: "プロフィール" },
   { href: "/student/dashboard", icon: LayoutDashboard, label: "ダッシュボード" },
   { href: "/student/feedback", icon: MessageSquare, label: "フィードバック" },
+  { href: "/student/messages", icon: MessageSquare, label: "メッセージ" },
 ] as const;
 
 export default function FooterNav() {
@@ -33,7 +34,7 @@ export default function FooterNav() {
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white">
-      <ul className="grid grid-cols-5">
+      <ul className="grid grid-cols-6">
         {items.map(({ href, icon: Icon, label }) => {
           const active = pathname === href;
           return (

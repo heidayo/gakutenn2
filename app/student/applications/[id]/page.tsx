@@ -81,6 +81,17 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
     : job?.companies;
   console.log("nested job:", job, "nested company:", company);
 
+  // Fetch the chat room ID for this application
+  const { data: chatRoom, error: chatRoomError } = await supabase
+    .from('chat_rooms')
+    .select('id')
+    .eq('application_id', id)
+    .single();
+  if (chatRoomError) {
+    console.error('chat room fetch error:', chatRoomError);
+  }
+  const chatRoomId = chatRoom?.id;
+
   const getStepStatus = (status: string) => {
     switch (status) {
       case "completed":
@@ -197,7 +208,7 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
 
         {/* Action Buttons */}
         <div className="space-y-3">
-          <Link href={`/student/messages/1`}>
+          <Link href={`/student/messages/${chatRoomId}`}>
             <Button className="w-full bg-blue-600 hover:bg-blue-700">
               <MessageSquare className="h-4 w-4 mr-2" />
               企業とメッセージ

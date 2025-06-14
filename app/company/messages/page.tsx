@@ -29,7 +29,7 @@ import { supabase } from "@/lib/supabase/client"
 export default function CompanyMessagesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [selectedChat, setSelectedChat] = useState<number | null>(1)
+  const [selectedChat, setSelectedChat] = useState<string | null>(null)
 
   // ---------- Supabase‑backed state ----------
   interface MessageStats {
@@ -42,7 +42,7 @@ export default function CompanyMessagesPage() {
   }
 
   interface ChatRoom {
-    id: number
+    id: string
     student: {
       name: string
       university: string
@@ -81,6 +81,48 @@ export default function CompanyMessagesPage() {
 
   const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [newMessage, setNewMessage] = useState<string>("")
+
+  const fetchMessages = async () => {
+    if (!selectedChat) return;
+    const { data: rows, error } = await supabase
+      .from("messages")
+      .select("id,sender,content,created_at,is_read,type")
+      .eq("application_id", selectedChat)
+      .order("created_at");
+    if (!error && rows) {
+      setChatMessages(
+        rows.map((m: any) => ({
+          id: m.id,
+          sender: m.sender,
+          content: m.content,
+          timestamp: new Date(m.created_at).toLocaleTimeString("ja-JP", {
+            hour: "2-digit",
+            minute: "2-digit",
+          }),
+          isRead: m.is_read,
+          type: m.type,
+        }))
+      );
+    }
+  };
+  const sendMessage = async () => {
+    if (!newMessage.trim() || !selectedChat) return;
+    const { error } = await supabase
+      .from("messages")
+      .insert({
+        application_id: selectedChat,
+        sender: "company",
+        content: newMessage,
+        type: "text",
+      });
+    if (error) {
+      console.error("メッセージ送信エラー", error);
+    } else {
+      setNewMessage("");
+      fetchMessages();
+    }
+  };
 
   // fetch chat rooms & stats once
   useEffect(() => {
@@ -102,49 +144,48 @@ export default function CompanyMessagesPage() {
 
       // ---- chat rooms ----
       const { data: rooms } = await sb
-        .from("chat_rooms_view") // ← 実際の view / table 名に合わせて修正
-        .select(
-          `
-            id,
-            last_message,
-            unread_count,
-            status,
-            priority,
-            last_seen,
-            is_online,
-            jobs(title),
-            student:profiles(full_name, university, avatar)
-          `
-        )
-        .order("last_message_at", { ascending: false })
+        .from("company_chat_rooms_view")
+        .select(`
+          chat_room_id,
+          application_id,
+          job_title,
+          applicant_name,
+          application_title,
+          application_status,
+          unread_count,
+          last_message,
+          last_message_at
+        `)
+        .order("last_message_at", { ascending: false });
 
       setChatRooms(
         (rooms ?? []).map((r: any) => ({
-          id: r.id,
+          id: r.chat_room_id,
+          applicationId: r.application_id,
           student: {
-            name: r.student.full_name,
-            university: r.student.university,
-            avatar: r.student.avatar ?? r.student.full_name?.charAt(0) ?? "?",
+            name: r.applicant_name,
+            avatar: r.applicant_name.charAt(0) ?? "?",
             profileImage: null,
           },
-          job: r.jobs.title,
+          job: r.job_title,
           lastMessage: r.last_message ?? "",
-          timestamp: new Date(r.last_message_at ?? r.last_seen).toLocaleTimeString("ja-JP", {
+          timestamp: new Date(r.last_message_at).toLocaleTimeString("ja-JP", {
             hour: "2-digit",
             minute: "2-digit",
           }),
           unreadCount: r.unread_count ?? 0,
+          // The following fields are not available in the new view, so provide defaults or remove as needed
           isRead: (r.unread_count ?? 0) === 0,
           hasAttachment: false,
-          status: r.status ?? "面談調整中",
-          priority: (r.priority ?? "normal") as "high" | "medium" | "normal",
-          isOnline: r.is_online ?? false,
-          lastSeen: r.last_seen ? `${Math.floor((Date.now() - Date.parse(r.last_seen)) / 3600000)}時間前` : "オンライン",
+          status: r.application_status ?? "面談調整中",
+          priority: "normal",
+          isOnline: false,
+          lastSeen: "",
         }))
       )
 
       // set default selected chat
-      if (rooms && rooms.length > 0) setSelectedChat(rooms[0].id)
+      if (rooms && rooms.length > 0) setSelectedChat(rooms[0].chat_room_id)
     }
 
     loadRooms()
@@ -152,32 +193,7 @@ export default function CompanyMessagesPage() {
 
   // fetch messages for selected chat
   useEffect(() => {
-    if (!selectedChat) return
-    const sb = supabase as any
-
-    const loadMessages = async () => {
-      const { data: rows } = await sb
-        .from("messages")
-        .select("id,sender,content,created_at,is_read,type")
-        .eq("chat_room_id", selectedChat)
-        .order("created_at")
-
-      setChatMessages(
-        (rows ?? []).map((m: any) => ({
-          id: m.id,
-          sender: m.sender,
-          content: m.content,
-          timestamp: new Date(m.created_at).toLocaleTimeString("ja-JP", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          isRead: m.is_read,
-          type: m.type,
-        }))
-      )
-    }
-
-    loadMessages()
+    fetchMessages();
   }, [selectedChat])
 
   const getStatusColor = (status: string) => {
@@ -490,9 +506,18 @@ export default function CompanyMessagesPage() {
                     <Calendar className="h-5 w-5 text-gray-600" />
                   </Button>
                   <div className="flex-1">
-                    <Input placeholder="メッセージを入力..." className="rounded-full border-gray-300" />
+                    <Input
+                      placeholder="メッセージを入力..."
+                      className="rounded-full border-gray-300"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") sendMessage(); }}
+                    />
                   </div>
-                  <Button className="h-10 w-10 p-0 rounded-full bg-blue-600 hover:bg-blue-700">
+                  <Button
+                    className="h-10 w-10 p-0 rounded-full bg-blue-600 hover:bg-blue-700"
+                    onClick={sendMessage}
+                  >
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>

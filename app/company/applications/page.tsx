@@ -208,9 +208,6 @@ export default function ApplicationsPage() {
                           <div>
                             追加情報: {applicant.additionalInfo ?? "なし"}
                           </div>
-                          <div>
-                            利用規約同意: {applicant.agreeTerms ? "はい" : "いいえ"}
-                          </div>
                           <div className="flex items-center space-x-1">
                             <Building2 className="h-4 w-4 text-gray-500" />
                             <span>求人: {applicant.jobTitle}</span>
@@ -225,10 +222,12 @@ export default function ApplicationsPage() {
                           詳細
                         </Button>
                       </Link>
-                      <Button variant="outline" size="sm">
-                        <MessageSquare className="h-4 w-4 mr-1" />
-                        メッセージ
-                      </Button>
+                      <Link href="/company/messages">
+                        <Button variant="outline" size="sm">
+                          <MessageSquare className="h-4 w-4 mr-1" />
+                          メッセージ
+                        </Button>
+                      </Link>
                     </div>
                   </div>
                 </div>

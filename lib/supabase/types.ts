@@ -75,6 +75,46 @@ export type Database = {
           },
         ]
       }
+      chat_rooms: {
+        Row: {
+          application_id: string
+          created_at: string | null
+          id: number
+        }
+        Insert: {
+          application_id: string
+          created_at?: string | null
+          id?: number
+        }
+        Update: {
+          application_id?: string
+          created_at?: string | null
+          id?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "chat_rooms_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chat_rooms_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "company_chat_rooms_view"
+            referencedColumns: ["application_id"]
+          },
+          {
+            foreignKeyName: "chat_rooms_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "company_chat_rooms_view"
+            referencedColumns: ["chat_room_id"]
+          },
+        ]
+      }
       companies: {
         Row: {
           address: string | null
@@ -415,6 +455,58 @@ export type Database = {
           },
         ]
       }
+      messages: {
+        Row: {
+          application_id: string
+          content: string
+          created_at: string
+          id: string
+          is_read: boolean
+          sender: string
+          type: string
+        }
+        Insert: {
+          application_id: string
+          content: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          sender: string
+          type?: string
+        }
+        Update: {
+          application_id?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          sender?: string
+          type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "company_chat_rooms_view"
+            referencedColumns: ["application_id"]
+          },
+          {
+            foreignKeyName: "messages_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "company_chat_rooms_view"
+            referencedColumns: ["chat_room_id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -525,7 +617,20 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      company_chat_rooms_view: {
+        Row: {
+          applicant_name: string | null
+          application_id: string | null
+          application_status: string | null
+          application_title: string | null
+          chat_room_id: string | null
+          job_title: string | null
+          last_message: string | null
+          last_message_at: string | null
+          unread_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never
