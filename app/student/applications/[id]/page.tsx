@@ -65,15 +65,21 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
     .eq("user_id", session.user.id)
     .eq("id", id)
     .single();
+  console.log("application data:", application, "fetch error:", error);
 
   if (error || !application) {
     console.error(error);
     return <div>データの取得に失敗しました。</div>;
   }
 
-  // Supabase returns child relations as arrays; extract the first elements
-  const job = application.jobs?.[0];
-  const company = job?.companies?.[0];
+  // Supabase returns child relations as arrays or objects; extract the first element if array
+  const job = Array.isArray(application.jobs)
+    ? application.jobs[0]
+    : application.jobs;
+  const company = Array.isArray(job?.companies)
+    ? job.companies[0]
+    : job?.companies;
+  console.log("nested job:", job, "nested company:", company);
 
   const getStepStatus = (status: string) => {
     switch (status) {
