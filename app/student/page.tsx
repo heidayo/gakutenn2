@@ -231,16 +231,16 @@ export default function StudentHomePage() {
 
       // 応募中
       const { count: applyingCnt } = await supabase
-        .from("student_applications")
+        .from("applications")
         .select("id", { count: "exact", head: true })
-        .eq("student_id", userId)
+        .eq("user_id", userId)
         .eq("status", "応募中")
 
       // 面談予定
       const { count: interviewCnt } = await supabase
-        .from("student_applications")
+        .from("applications")
         .select("id", { count: "exact", head: true })
-        .eq("student_id", userId)
+        .eq("user_id", userId)
         .eq("status", "面談予定")
 
       // 平均評価 (feedbacks テーブル想定)

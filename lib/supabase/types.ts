@@ -273,13 +273,6 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "feedbacks_internship_id_fkey"
-            columns: ["internship_id"]
-            isOneToOne: false
-            referencedRelation: "internships"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "feedbacks_template_id_fkey"
             columns: ["template_id"]
             isOneToOne: false
@@ -288,68 +281,84 @@ export type Database = {
           },
         ]
       }
-      internships: {
+      interviews: {
         Row: {
+          applicant_id: string
           company_id: string
-          created_at: string | null
-          department: string
-          end_date: string
-          id: string
-          job_name: string
-          job_title: string
-          mentor_name: string | null
-          start_date: string
-          status: string | null
-          student_id: string
-          total_hours: number | null
-          updated_at: string | null
-          work_days: number | null
+          created_at: string
+          date: string
+          end_time: string
+          evaluation: string | null
+          id: number
+          interviewer: string | null
+          job_id: string
+          location: string | null
+          meeting_link: string | null
+          notes: string | null
+          priority: string
+          start_time: string
+          status: string
+          type: string
+          updated_at: string
         }
         Insert: {
+          applicant_id: string
           company_id: string
-          created_at?: string | null
-          department: string
-          end_date: string
-          id?: string
-          job_name: string
-          job_title: string
-          mentor_name?: string | null
-          start_date: string
-          status?: string | null
-          student_id: string
-          total_hours?: number | null
-          updated_at?: string | null
-          work_days?: number | null
+          created_at?: string
+          date: string
+          end_time: string
+          evaluation?: string | null
+          id?: number
+          interviewer?: string | null
+          job_id: string
+          location?: string | null
+          meeting_link?: string | null
+          notes?: string | null
+          priority?: string
+          start_time: string
+          status?: string
+          type: string
+          updated_at?: string
         }
         Update: {
+          applicant_id?: string
           company_id?: string
-          created_at?: string | null
-          department?: string
-          end_date?: string
-          id?: string
-          job_name?: string
-          job_title?: string
-          mentor_name?: string | null
-          start_date?: string
-          status?: string | null
-          student_id?: string
-          total_hours?: number | null
-          updated_at?: string | null
-          work_days?: number | null
+          created_at?: string
+          date?: string
+          end_time?: string
+          evaluation?: string | null
+          id?: number
+          interviewer?: string | null
+          job_id?: string
+          location?: string | null
+          meeting_link?: string | null
+          notes?: string | null
+          priority?: string
+          start_time?: string
+          status?: string
+          type?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "internships_company_id_fkey"
+            foreignKeyName: "interviews_applicant_id_fkey"
+            columns: ["applicant_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
+          },
+          {
+            foreignKeyName: "interviews_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "internships_student_id_fkey"
-            columns: ["student_id"]
+            foreignKeyName: "interviews_job_id_fkey"
+            columns: ["job_id"]
             isOneToOne: false
-            referencedRelation: "students"
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
         ]

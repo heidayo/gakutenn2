@@ -43,6 +43,8 @@ export default function CompanyInterviewsPage() {
   const [selectedInterviews, setSelectedInterviews] = useState<number[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(new Date())
+  const [applicants, setApplicants] = useState<{ id: string; name: string; job_id: string; user_id: string }[]>([]);
+  const [selectedApplicantId, setSelectedApplicantId] = useState<string>("");
   const params = useParams<{ companyId: string }>()
   const companyId = (params?.companyId ?? "") as string
 
@@ -66,61 +68,86 @@ export default function CompanyInterviewsPage() {
 
   const [interviews, setInterviews] = useState<Interview[]>([])
 
+  // 面談一覧取得
+  const fetchInterviews = async () => {
+    const sb = supabase as any;
+    const { data, error } = await sb
+      .from("interviews")
+      .select(`
+        id,
+        date,
+        start_time,
+        end_time,
+        type,
+        status,
+        interviewer,
+        meeting_link,
+        location,
+        notes,
+        evaluation,
+        priority,
+        applicant_id,
+        profiles!inner(user_id, full_name),
+        jobs(title)
+      `)
+      .eq("company_id", companyId)
+      .order("date");
+    if (error) {
+      console.error("interviews fetch error", error);
+      return;
+    }
+    setInterviews(
+      (data ?? []).map((row: any) => ({
+        id: row.id,
+        applicant: row.profiles.full_name,
+        applicantId: row.applicant_id,
+        job: row.jobs.title,
+        date: new Date(row.date).toLocaleDateString("ja-JP"),
+        time:
+          row.start_time && row.end_time
+            ? `${row.start_time}-${row.end_time}`
+            : "",
+        type: row.type,
+        status: row.status,
+        interviewer: row.interviewer ?? "-",
+        meetingLink: row.meeting_link ?? undefined,
+        location: row.location ?? undefined,
+        notes: row.notes ?? undefined,
+        evaluation: row.evaluation ?? undefined,
+        priority: row.priority ?? "中",
+      }))
+    );
+  };
+
   // データ取得（companyIdが取得できてから実行、companyIdでフィルタ）
   useEffect(() => {
-    if (!companyId) return  // companyId 未取得時は何もしない
+    if (!companyId) return;
+    fetchInterviews();
+  }, [companyId]);
 
-    const fetchInterviews = async () => {
-      const sb = supabase as any
-      const { data, error } = await sb
-        .from("interviews")
-        .select(`
-          id,
-          date,
-          start_time,
-          end_time,
-          type,
-          status,
-          interviewer,
-          meeting_link,
-          location,
-          notes,
-          evaluation,
-          priority,
-          applicant_id,
-          profiles!inner(id, full_name),
-          jobs(title)
-        `)
+  // 応募者データ取得
+  useEffect(() => {
+    if (!companyId) return;
+    const fetchApplicants = async () => {
+      const { data, error } = await supabase
+        .from("applications")
+        .select("id, name, job_id, user_id")
         .eq("company_id", companyId)
-        .order("date")
-
+        .order("created_at", { ascending: false });
       if (error) {
-        console.error("interviews fetch error", error)
-        return
+        console.error("applications fetch error", error);
+        return;
       }
-
-      setInterviews(
-        (data ?? []).map((row: any) => ({
-          id: row.id,
-          applicant: row.profiles.full_name,
-          applicantId: row.applicant_id,
-          job: row.jobs.title,
-          date: new Date(row.date).toLocaleDateString("ja-JP"),
-          time: row.start_time && row.end_time ? `${row.start_time}-${row.end_time}` : "",
-          type: row.type,
-          status: row.status,
-          interviewer: row.interviewer ?? "-",
-          meetingLink: row.meeting_link ?? undefined,
-          location: row.location ?? undefined,
-          notes: row.notes ?? undefined,
-          evaluation: row.evaluation ?? undefined,
-          priority: row.priority ?? "中",
-        }))
-      )
-    }
-
-    fetchInterviews()
-  }, [companyId])
+      const formatted = (data ?? []).map((item) => ({
+        id:     item.id,
+        name:   item.name   ?? "未設定",
+        job_id: item.job_id,
+        user_id: item.user_id,
+      }));
+      setApplicants(formatted);
+    };
+    fetchApplicants();
+  }, [companyId]);
 
   // 面談枠設定
   const [timeSlots, setTimeSlots] = useState([
@@ -130,6 +157,43 @@ export default function CompanyInterviewsPage() {
     { id: 4, day: "木曜日", times: ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"] },
     { id: 5, day: "金曜日", times: ["09:00", "10:00", "11:00", "14:00", "15:00", "16:00"] },
   ])
+
+  // 面談作成ダイアログ用 state とハンドラ
+  const [newDate, setNewDate] = useState<string>(new Date().toISOString().split("T")[0]);
+  const [newTime, setNewTime] = useState<string>("09:00");
+  const [newType, setNewType] = useState<string>("オンライン");
+  const [newNotes, setNewNotes] = useState("");
+  const handleCreateInterview = async () => {
+    setIsLoading(true);
+    const applicant = applicants.find(a => a.id === selectedApplicantId);
+    if (!applicant) {
+      alert("応募者を選択してください");
+      setIsLoading(false);
+      return;
+    }
+    const { data, error } = await supabase
+      .from("interviews")
+      .insert([{
+        company_id:   companyId,
+        applicant_id: applicant.user_id,
+        job_id:       applicant.job_id,
+        date:         newDate,
+        start_time:   newTime,
+        end_time:     newTime,
+        type:         newType,
+        notes:        newNotes,
+        status:       "予定",
+      }]);
+    if (error) {
+      console.error("面談作成エラー", error);
+      alert("面談作成失敗: " + error.message);
+    } else {
+      alert("面談が作成されました");
+      await fetchInterviews();
+      setShowCreateDialog(false);
+    }
+    setIsLoading(false);
+  };
 
   // リマインド設定
   const [reminderSettings, setReminderSettings] = useState({
@@ -659,27 +723,14 @@ export default function CompanyInterviewsPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>応募者</Label>
-                <Select>
+                <Select value={selectedApplicantId} onValueChange={setSelectedApplicantId}>
                   <SelectTrigger>
                     <SelectValue placeholder="応募者を選択" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="1">田中 太郎</SelectItem>
-                    <SelectItem value="2">佐藤 花子</SelectItem>
-                    <SelectItem value="3">山田 次郎</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label>面接官</Label>
-                <Select>
-                  <SelectTrigger>
-                    <SelectValue placeholder="面接官を選択" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="sato">佐藤マネージャー</SelectItem>
-                    <SelectItem value="tanaka">田中部長</SelectItem>
-                    <SelectItem value="suzuki">鈴木リーダー</SelectItem>
+                    {applicants.map((app) => (
+                      <SelectItem key={app.id} value={app.id}>{app.name}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -690,12 +741,14 @@ export default function CompanyInterviewsPage() {
                 <input
                   type="date"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
+                  value={newDate}
+                  onChange={(e) => setNewDate(e.target.value)}
                   min={new Date().toISOString().split("T")[0]}
                 />
               </div>
               <div className="space-y-2">
                 <Label>時間</Label>
-                <Select>
+                <Select value={newTime} onValueChange={setNewTime}>
                   <SelectTrigger>
                     <SelectValue placeholder="時間を選択" />
                   </SelectTrigger>
@@ -712,7 +765,7 @@ export default function CompanyInterviewsPage() {
             </div>
             <div className="space-y-2">
               <Label>面談形式</Label>
-              <Select>
+              <Select value={newType} onValueChange={setNewType}>
                 <SelectTrigger>
                   <SelectValue placeholder="面談形式を選択" />
                 </SelectTrigger>
@@ -725,7 +778,11 @@ export default function CompanyInterviewsPage() {
             </div>
             <div className="space-y-2">
               <Label>メモ（任意）</Label>
-              <Textarea placeholder="面談に関するメモや準備事項を入力..." />
+              <Textarea
+                value={newNotes}
+                onChange={(e) => setNewNotes(e.target.value)}
+                placeholder="面談に関するメモや準備事項を入力..."
+              />
             </div>
             <div className="space-y-2">
               <Label>リマインダー設定</Label>
@@ -741,10 +798,17 @@ export default function CompanyInterviewsPage() {
               </div>
             </div>
             <div className="flex space-x-2">
-              <Button variant="outline" onClick={() => setShowCreateDialog(false)} className="flex-1">
+              <Button
+                variant="outline"
+                onClick={() => setShowCreateDialog(false)}
+                className="flex-1"
+              >
                 キャンセル
-              </Button>
-              <Button onClick={() => setShowCreateDialog(false)} className="flex-1 bg-blue-600 hover:bg-blue-700">
+              </Button> <Button
+                onClick={handleCreateInterview}
+                disabled={isLoading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700"
+              >
                 面談を作成
               </Button>
             </div>
