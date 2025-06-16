@@ -631,6 +631,21 @@ export type Database = {
         }
         Relationships: []
       }
+      student_chat_rooms_view: {
+        Row: {
+          company_logo: string | null
+          company_name: string | null
+          has_attachment: boolean | null
+          job_title: string | null
+          last_message: string | null
+          last_message_at: string | null
+          room_id: number | null
+          status: string | null
+          student_id: string | null
+          unread_count: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       [_ in never]: never

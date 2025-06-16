@@ -1,3 +1,4 @@
+"use client"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -16,53 +17,64 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase/client"
+
+interface ChatRoom {
+  id: number
+  company: string
+  companyLogo: string
+  lastMessage: string
+  timestamp: string
+  unreadCount: number
+  isRead: boolean
+  hasAttachment: boolean
+  status: string
+}
+
 export default function StudentMessagesPage() {
-  const chatRooms = [
-    {
-      id: 1,
-      company: "株式会社テックスタート",
-      companyLogo: "T",
-      lastMessage: "面談の件でご連絡いたします。来週の火曜日14:00はいかがでしょうか？",
-      timestamp: "14:30",
-      unreadCount: 2,
-      isRead: false,
-      hasAttachment: false,
-      status: "面談調整中",
-    },
-    {
-      id: 2,
-      company: "クリエイティブ合同会社",
-      companyLogo: "C",
-      lastMessage: "ありがとうございました！",
-      timestamp: "昨日",
-      unreadCount: 0,
-      isRead: true,
-      hasAttachment: false,
-      status: "完了",
-    },
-    {
-      id: 3,
-      company: "イノベーション株式会社",
-      companyLogo: "I",
-      lastMessage: "契約書を添付いたします。ご確認ください。",
-      timestamp: "2日前",
-      unreadCount: 1,
-      isRead: false,
-      hasAttachment: true,
-      status: "書類確認中",
-    },
-    {
-      id: 4,
-      company: "マーケティングプロ",
-      companyLogo: "M",
-      lastMessage: "お疲れ様でした。フィードバックをお送りします。",
-      timestamp: "1週間前",
-      unreadCount: 0,
-      isRead: true,
-      hasAttachment: false,
-      status: "フィードバック済み",
-    },
-  ]
+  const [chatRooms, setChatRooms] = useState<ChatRoom[]>([])
+  const [selectedRoomId, setSelectedRoomId] = useState<number | null>(null)
+
+  useEffect(() => {
+    const fetchRooms = async () => {
+      // 現在ログイン中の student_id を取得
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: rooms, error } = await supabase
+        .from("student_chat_rooms_view")
+        .select("room_id, company_name, company_logo, last_message, last_message_at, unread_count, has_attachment, status")
+        .eq("student_id", user.id)
+        .order("last_message_at", { ascending: false })
+
+      if (error) {
+        console.error("ルーム取得エラー", error)
+        return
+      }
+
+      const mapped = (rooms ?? []).map((r: any) => ({
+        id: r.room_id,
+        company: r.company_name,
+        companyLogo: r.company_logo ?? r.company_name.charAt(0),
+        lastMessage: r.last_message,
+        timestamp: new Date(r.last_message_at).toLocaleTimeString("ja-JP", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+        unreadCount: r.unread_count ?? 0,
+        isRead: (r.unread_count ?? 0) === 0,
+        hasAttachment: r.has_attachment,
+        status: r.status,
+      }))
+      setChatRooms(mapped)
+      if (mapped.length > 0) setSelectedRoomId(mapped[0].id)
+    }
+
+    fetchRooms()
+  }, [])
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -108,7 +120,12 @@ export default function StudentMessagesPage() {
       <div className="px-4 py-2">
         {chatRooms.map((room) => (
           <Link key={room.id} href={`/student/messages/${room.id}`}>
-            <Card className="mb-2 p-4 hover:bg-gray-50 transition-colors">
+            <Card
+              onClick={() => setSelectedRoomId(room.id)}
+              className={`mb-2 p-4 hover:bg-gray-50 transition-colors ${
+                selectedRoomId === room.id ? "bg-blue-50" : ""
+              }`}
+            >
               <div className="flex items-center space-x-3">
                 {/* Company Logo */}
                 <div className="relative">

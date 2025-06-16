@@ -140,11 +140,17 @@ export default function ChatPage({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     if (!applicationId) return
+
     const channel = supabase
-      .channel('public:messages')
+      .channel(`public:messages:application_id=eq.${applicationId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'messages', filter: `application_id=eq.${applicationId}` },
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `application_id=eq.${applicationId}`,
+        },
         (payload) => {
           setMessagesData((prev) => [...prev, payload.new as MessageRow])
         }
@@ -169,7 +175,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
 
   const handleSendMessage = async () => {
     if (!message.trim() || !applicationId) return
-    const { error } = await supabase
+    const { data: inserted, error } = await supabase
       .from('messages')
       .insert({
         application_id: applicationId,
@@ -179,9 +185,24 @@ export default function ChatPage({ params }: { params: { id: string } }) {
         is_read: false,
         created_at: new Date().toISOString(),
       })
+      .select()
+      .single()
+
     if (error) {
       console.error('message send error:', error)
-    } else {
+    } else if (inserted) {
+      setMessagesData(prev => [
+        ...prev,
+        {
+          id: inserted.id,
+          application_id: inserted.application_id,
+          content: inserted.content,
+          created_at: inserted.created_at,
+          is_read: inserted.is_read,
+          sender: inserted.sender,
+          type: inserted.type,
+        }
+      ])
       setMessage('')
     }
   }
@@ -228,12 +249,6 @@ export default function ChatPage({ params }: { params: { id: string } }) {
           </div>
           <div className="flex items-center space-x-2">
             <Button variant="ghost" size="sm">
-              <Phone className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm">
-              <Video className="h-4 w-4" />
-            </Button>
-            <Button variant="ghost" size="sm">
               <MoreVertical className="h-4 w-4" />
             </Button>
           </div>
@@ -241,7 +256,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
       </header>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-4 py-4 pb-24 space-y-4">
         {messagesData.map((msg) => (
           <div key={msg.id} className={`flex ${msg.sender === "student" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[80%] ${msg.sender === "student" ? "order-2" : "order-1"}`}>
@@ -290,7 +305,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
       </div>
 
       {/* Input Area */}
-      <div className="bg-white border-t px-4 py-3">
+      <div className="fixed bottom-16 left-0 right-0 bg-white border-t px-4 py-3 z-50">
         <div className="flex items-end space-x-2">
           {/* Attachment Menu */}
           <div className="relative">
