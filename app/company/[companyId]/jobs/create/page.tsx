@@ -23,6 +23,7 @@ import {
   Copy,
 } from "lucide-react"
 import Link from "next/link"
+import { useParams } from "next/navigation"
 import { useState } from "react"
 import { supabase } from "@/lib/supabase/client";
 import { useRouter } from "next/navigation";
@@ -121,6 +122,8 @@ export default function CreateJobPage() {
   const [errors, setErrors] = useState<FieldErrorMap>({})
 
   const router = useRouter();
+  const params = useParams<{ companyId: string }>()
+  const routeCompanyId = (params?.companyId ?? "") as string
 
   const categories = [
     "マーケティング",
@@ -227,6 +230,8 @@ export default function CreateJobPage() {
   }
 
   const handleSave = async (status: string) => {
+    // --- 型安全外のテーブルは any キャストで回避 ---
+    const sb = supabase as any
     // ─── バリデーション ──────────────────────────────
     const newErrors: FieldErrorMap = {};
     if (!formData.title) newErrors.title = "職種名は必須です";
@@ -250,41 +255,38 @@ export default function CreateJobPage() {
     }
 
     // --- 企業ID を解決 ---------------------------------------------
-    let companyId: string | null = null;
+    let companyId: string | null = routeCompanyId || null
 
-    // ① company_members から取得（推奨パス）
-    const { data: memberRow, error: memberErr } = await supabase
-      .from("company_members")
-      .select("company_id")
-      .eq("user_id", session.user.id)
-      .maybeSingle();
+    if (!companyId) {
+      // ① company_members から取得（推奨パス）
+      const { data: memberRow, error: memberErr } = await sb
+        .from("company_members")
+        .select("company_id")
+        .eq("user_id", session.user.id)
+        .maybeSingle()
 
-    if (memberRow?.company_id) {
-      companyId = memberRow.company_id;
-    } else {
-      // ② fallback: companies.email が Auth の email と一致する行を探す
-      let companyRow: { id: string } | null = null;
-      let companyErr: any = null;
-
-      if (session.user.email) {
-        const { data, error } = await supabase
-          .from("companies")
-          .select("id")
-          .eq("email", session.user.email)
-          .maybeSingle<{ id: string }>();
-
-        companyRow = data;
-        companyErr = error;
-      }
-
-      if (companyRow?.id) {
-        companyId = companyRow.id;
+      if (memberRow?.company_id) {
+        companyId = memberRow.company_id
       } else {
-        console.error("企業メンバー取得エラー:", memberErr ?? companyErr);
-        alert(
-          "企業情報を取得できませんでした。\n企業へ参加済みか、企業登録のメールアドレスが一致しているかをご確認ください。"
-        );
-        return;
+        // ② fallback: companies.email が Auth の email と一致する行を探す
+        if (session.user.email) {
+          const { data, error } = await sb
+            .from("companies")
+            .select("id")
+            .eq("email", session.user.email)
+            .maybeSingle()
+          const companyRow = data as { id: string } | null
+          const companyErr = error
+          if (companyRow?.id) {
+            companyId = companyRow.id
+          } else {
+            console.error("企業メンバー取得エラー:", memberErr ?? companyErr)
+            alert(
+              "企業情報を取得できませんでした。\n企業へ参加済みか、企業登録のメールアドレスが一致しているかをご確認ください。"
+            )
+            return
+          }
+        }
       }
     }
 
@@ -333,7 +335,7 @@ export default function CreateJobPage() {
     };
 
     // ─── Supabase へ保存 ────────────────────────────
-    const { error } = await supabase.from("jobs").insert(payload);
+    const { error } = await sb.from("jobs").insert(payload);
 
     if (error) {
       console.error("Error saving job:", error);
@@ -342,7 +344,7 @@ export default function CreateJobPage() {
     }
 
     alert(status === "published" ? "求人を公開しました！" : "下書きを保存しました！");
-    router.push("/company/jobs"); // 一覧へリダイレクト
+    router.push(companyId ? `/company/${companyId}/jobs` : "/company/jobs")
   };
 
   const handlePreview = () => {
@@ -377,7 +379,7 @@ export default function CreateJobPage() {
       <header className="bg-white border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link href="/company/jobs">
+            <Link href={routeCompanyId ? `/company/${routeCompanyId}/jobs` : "#"}>
               <Button variant="ghost" size="sm">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 求人一覧に戻る

@@ -14,6 +14,7 @@ import {
   Building2,
 } from "lucide-react"
 import Link from "next/link"
+import { useParams } from "next/navigation"
 
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
@@ -43,41 +44,64 @@ export default function ApplicationsPage() {
   });
   const [applications, setApplications] = useState<ApplicationRow[]>([]);
 
+  const params = useParams<{ companyId: string }>()
+  const companyId = (params?.companyId ?? "") as string
+
   useEffect(() => {
+    if (!companyId) return    // companyId 未取得時は待機
+
     const fetchData = async () => {
       const { count: total } = await supabase
         .from("applications")
-        .select("id", { count: "exact", head: true });
-      setStats({ total: total ?? 0, pending: 0, interviewing: 0, hired: 0, rejected: 0 });
+        .select("id", { count: "exact", head: true })
+        .eq("company_id", companyId)
+      setStats({ total: total ?? 0, pending: 0, interviewing: 0, hired: 0, rejected: 0 })
 
       const { data: rows, error } = await supabase
         .from("applications")
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(50);
+        .select(`
+          id,
+          job_id,
+          user_id,
+          available_days,
+          start_date,
+          additional_info,
+          agree_terms,
+          created_at,
+          name,
+          title,
+          status,
+          next_step,
+          next_date
+        `)
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false })
+        .limit(50)
 
       if (error) {
-        console.error('Error fetching applications:', error);
+        console.error("Error fetching applications:", error)
       }
 
-      setApplications((rows ?? []).map((r: any) => ({
-        id: r.id,
-        jobId: r.job_id,
-        userId: r.user_id,
-        availableDays: r.available_days,
-        startDate: new Date(r.start_date).toLocaleDateString("ja-JP"),
-        additionalInfo: r.additional_info,
-        agreeTerms: r.agree_terms,
-        createdAt: new Date(r.created_at).toLocaleDateString("ja-JP"),
-        jobTitle: r.title, // fallback to ID if join fails
-        name: r.name,     // fallback to user_id if join fails
-        university: '-',     // placeholder
-        location: '-',       // placeholder
-      })));
-    };
+      setApplications(
+        (rows ?? []).map((r: any) => ({
+          id: r.id,
+          jobId: r.job_id,
+          userId: r.user_id,
+          availableDays: r.available_days ?? [],
+          startDate: new Date(r.start_date).toLocaleDateString("ja-JP"),
+          additionalInfo: r.additional_info,
+          agreeTerms: r.agree_terms,
+          createdAt: new Date(r.created_at).toLocaleDateString("ja-JP"),
+          jobTitle: r.title ?? "-",
+          name: r.name ?? "名前未登録",
+          university: "-",
+          location: "-",
+        }))
+      )
+    }
 
-    fetchData();
-  }, []);
+    fetchData()
+  }, [companyId])
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -216,13 +240,13 @@ export default function ApplicationsPage() {
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
-                      <Link href={`/company/applications/${applicant.id}`}>
+                      <Link href={companyId ? `/company/${companyId}/applications/${applicant.id}` : "#"}>
                         <Button variant="outline" size="sm">
                           <Eye className="h-4 w-4 mr-1" />
                           詳細
                         </Button>
                       </Link>
-                      <Link href="/company/messages">
+                      <Link href={companyId ? `/company/${companyId}/messages` : "#"}>
                         <Button variant="outline" size="sm">
                           <MessageSquare className="h-4 w-4 mr-1" />
                           メッセージ

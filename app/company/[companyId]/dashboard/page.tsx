@@ -20,6 +20,7 @@ import {
   ArrowRight,
 } from "lucide-react"
 import Link from "next/link"
+import { useParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { supabase } from "@/lib/supabase/client"   // Supabase browser client
 
@@ -83,25 +84,31 @@ export default function CompanyDashboard() {
   const [upcomingInterviews, setUpcomingInterviews] = useState<Interview[]>([])
   const [jobPerformance, setJobPerformance] = useState<JobPerf[]>([])
 
+  // --- Get companyId from route params ---
+  const params = useParams<{ companyId: string }>()
+  const companyId = (params?.companyId ?? "") as string
+
   useEffect(() => {
+    if (!companyId) return
     const fetchData = async () => {
       // 型エラー回避用 — 型が揃うまで any キャスト
       const sb = supabase as any
       // ------ KPI counts ------
       const [{ count: totalJobs }, { count: activeJobs }] = await Promise.all([
-        sb.from("jobs").select("id", { count: "exact", head: true }),
-        sb.from("jobs").select("id", { count: "exact", head: true }).eq("is_active", true),
+        sb.from("jobs").select("id", { count: "exact", head: true }).eq("company_id", companyId),
+        sb.from("jobs").select("id", { count: "exact", head: true }).eq("company_id", companyId).eq("is_active", true),
       ])
 
       const [{ count: totalApplications }, { count: totalHires }] = await Promise.all([
-        sb.from("applications").select("id", { count: "exact", head: true }),
-        sb.from("applications").select("id", { count: "exact", head: true }).eq("status", "合格"),
+        sb.from("applications").select("id", { count: "exact", head: true }).eq("company_id", companyId),
+        sb.from("applications").select("id", { count: "exact", head: true }).eq("company_id", companyId).eq("status", "合格"),
       ])
 
       // ------ Upcoming interviews ------
       const { data: interviewRows } = await sb
         .from("interviews")
         .select("id,date,time,type,job:title,profiles!inner(full_name)")
+        .eq("company_id", companyId)
         .gte("date", new Date().toISOString().slice(0, 10))
         .order("date")
 
@@ -109,6 +116,7 @@ export default function CompanyDashboard() {
       const { data: recentAppRows } = await sb
         .from("applications")
         .select("id,applied_at,status,rating,job:title,profiles!inner(full_name,university)")
+        .eq("company_id", companyId)
         .order("applied_at", { ascending: false })
         .limit(3)
 
@@ -116,9 +124,10 @@ export default function CompanyDashboard() {
       const { data: jobRows } = await sb
         .from("jobs")
         .select("id,title,views,applications,is_active")
+        .eq("company_id", companyId)
 
       // (任意) 応答率を RPC で計算している例。なければ 0 を設定
-      const { data: respStat } = await sb.rpc("calculate_response_rate")
+      const { data: respStat } = await sb.rpc("calculate_response_rate", { p_company_id: companyId })
       const responseRate = respStat?.rate ?? 0
 
       // ---------- state 更新 ----------
@@ -168,9 +177,8 @@ export default function CompanyDashboard() {
         })) ?? []
       )
     }
-
     fetchData()
-  }, [])
+  }, [companyId])
 
   const getTrendIcon = (trend: string, change: number) => {
     if (trend === "up") {
@@ -211,7 +219,7 @@ export default function CompanyDashboard() {
             <p className="text-sm text-gray-600">採用活動の概要と最新情報</p>
           </div>
           <div className="flex items-center space-x-3">
-            <Link href="/company/jobs/create">
+            <Link href={companyId ? `/company/${companyId}/jobs/create` : "#"}>
               <Button className="bg-blue-600 hover:bg-blue-700">
                 <Plus className="h-4 w-4 mr-2" />
                 新規求人作成
@@ -341,7 +349,7 @@ export default function CompanyDashboard() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">最新の応募者</CardTitle>
-                <Link href="/company/applications">
+                <Link href={companyId ? `/company/${companyId}/applications` : "#"}>
                   <Button variant="ghost" size="sm">
                     すべて見る
                     <ArrowRight className="ml-1 h-4 w-4" />
@@ -383,7 +391,7 @@ export default function CompanyDashboard() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-base">面談予定</CardTitle>
-                <Link href="/company/interviews">
+                <Link href={companyId ? `/company/${companyId}/interviews` : "#"}>
                   <Button variant="ghost" size="sm">
                     すべて見る
                     <ArrowRight className="ml-1 h-4 w-4" />
@@ -432,7 +440,7 @@ export default function CompanyDashboard() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">求人パフォーマンス</CardTitle>
-              <Link href="/company/jobs">
+              <Link href={companyId ? `/company/${companyId}/jobs` : "#"}>
                 <Button variant="ghost" size="sm">
                   求人管理
                   <ArrowRight className="ml-1 h-4 w-4" />
@@ -463,7 +471,7 @@ export default function CompanyDashboard() {
                         <span className="font-semibold">{job.conversionRate}%</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <Link href={`/company/jobs/${job.id}/edit`}>
+                        <Link href={companyId ? `/company/${companyId}/jobs/${job.id}/edit` : "#"}>
                           <Button variant="outline" size="sm">
                             <Eye className="h-4 w-4 mr-1" />
                             詳細
@@ -480,7 +488,7 @@ export default function CompanyDashboard() {
 
         {/* Quick Actions */}
         <div className="grid grid-cols-4 gap-4">
-          <Link href="/company/jobs/create">
+          <Link href={companyId ? `/company/${companyId}/jobs/create` : "#"}>
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="p-6 text-center">
                 <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-3">
@@ -492,7 +500,7 @@ export default function CompanyDashboard() {
             </Card>
           </Link>
 
-          <Link href="/company/applications">
+          <Link href={companyId ? `/company/${companyId}/applications` : "#"}>
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="p-6 text-center">
                 <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-3">
@@ -504,7 +512,7 @@ export default function CompanyDashboard() {
             </Card>
           </Link>
 
-          <Link href="/company/messages">
+          <Link href={companyId ? `/company/${companyId}/messages` : "#"}>
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="p-6 text-center">
                 <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-3">
@@ -516,7 +524,7 @@ export default function CompanyDashboard() {
             </Card>
           </Link>
 
-          <Link href="/company/analytics">
+          <Link href={companyId ? `/company/${companyId}/analytics` : "#"}>
             <Card className="hover:shadow-md transition-shadow cursor-pointer">
               <CardContent className="p-6 text-center">
                 <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-3">

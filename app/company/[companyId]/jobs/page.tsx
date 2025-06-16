@@ -34,6 +34,7 @@ import {
   JapaneseYenIcon as Yen,
 } from "lucide-react"
 import Link from "next/link"
+import { useParams } from "next/navigation"
 import { useState } from "react"
 import { useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
@@ -101,6 +102,9 @@ interface JobRow {
     views: { current: 0, previous: 0, change: 0 },
   })
 
+  const params = useParams<{ companyId: string }>()
+  const companyId = (params?.companyId ?? "") as string
+
   // --- Load jobs and stats from Supabase ---
   const loadJobs = async () => {
     const sb = supabase as any
@@ -137,6 +141,7 @@ interface JobRow {
         updated_at,
         search_vector
       `)
+      .eq("company_id", companyId)
 
     if (error) {
       console.error("Error loading jobs:", error)
@@ -214,11 +219,11 @@ interface JobRow {
       { count: totalInterviews },
       { count: totalHires },
     ] = await Promise.all([
-      sb.from("jobs").select("id", { count: "exact", head: true }),
-      sb.from("jobs").select("id", { count: "exact", head: true }).eq("status", "published"),
-      sb.from("applications").select("id", { count: "exact", head: true }),
-      sb.from("interviews").select("id", { count: "exact", head: true }),
-      sb.from("applications").select("id", { count: "exact", head: true }).eq("status", "合格"),
+      sb.from("jobs").select("id", { count: "exact", head: true }).eq("company_id", companyId),
+      sb.from("jobs").select("id", { count: "exact", head: true }).eq("company_id", companyId).eq("status", "published"),
+      sb.from("applications").select("id", { count: "exact", head: true }).eq("company_id", companyId),
+      sb.from("interviews").select("id", { count: "exact", head: true }).eq("company_id", companyId),
+      sb.from("applications").select("id", { count: "exact", head: true }).eq("company_id", companyId).eq("status", "合格"),
     ])
 
     const avgApps =
@@ -249,6 +254,8 @@ interface JobRow {
   }
 
   useEffect(() => {
+    if (!companyId) return    // companyId 未取得時は何もしない
+
     const sb = supabase as any
 
     // --- 初回読み込み ---
@@ -259,19 +266,20 @@ interface JobRow {
       .channel("company_jobs_realtime")
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "jobs" },
-        () => {
-          // 追加・更新・削除があったら一覧を再取得
-          loadJobs()
-        }
+        {
+          event: "*",
+          schema: "public",
+          table: "jobs",
+          filter: `company_id=eq.${companyId}`,
+        },
+        () => loadJobs()
       )
       .subscribe()
 
-    // --- クリーンアップ ---
     return () => {
       sb.removeChannel(jobsChannel)
     }
-  }, [])
+  }, [companyId])
 
   const handleSelectJob = (jobId: number) => {
     setSelectedJobs((prev) => (prev.includes(jobId) ? prev.filter((id) => id !== jobId) : [...prev, jobId]))
@@ -349,7 +357,7 @@ interface JobRow {
               <Download className="h-4 w-4 mr-2" />
               レポート出力
             </Button>
-            <Link href="/company/jobs/create">
+            <Link href={companyId ? `/company/${companyId}/jobs/create` : "#"}>
               <Button className="bg-blue-600 hover:bg-blue-700">
                 <Plus className="h-4 w-4 mr-2" />
                 新規求人作成
@@ -617,13 +625,13 @@ interface JobRow {
                     </div>
 
                     <div className="flex items-center space-x-2">
-                      <Link href={`/company/jobs/${job.id}/preview`}>
+                      <Link href={companyId ? `/company/${companyId}/jobs/${job.id}/preview` : "#"}>
                         <Button variant="outline" size="sm">
                           <Eye className="h-4 w-4 mr-1" />
                           プレビュー
                         </Button>
                       </Link>
-                      <Link href={`/company/jobs/${job.id}/edit`}>
+                      <Link href={companyId ? `/company/${companyId}/jobs/${job.id}/edit` : "#"}>
                         <Button variant="outline" size="sm">
                           <Edit className="h-4 w-4 mr-1" />
                           編集

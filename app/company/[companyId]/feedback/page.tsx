@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Star, Search, Filter, Plus, Calendar as CalendarIcon, User, Briefcase, Download } from "lucide-react"
 import { Calendar } from "@/components/ui/calendar"
 import { format } from "date-fns"
+import { useParams } from "next/navigation"
 import { ja } from "date-fns/locale"
 import type { DateRange } from "react-day-picker"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
@@ -54,12 +55,17 @@ export default function CompanyFeedbackPage() {
   // ---- Supabase data ----
   const [feedbacks, setFeedbacks] = useState<Feedback[]>([])
 
+  const params = useParams<{ companyId: string }>()
+  const companyId = (params?.companyId ?? "") as string
+
   useEffect(() => {
+    if (!companyId) return
+
     const sb = supabase as any
 
     const fetchFeedbacks = async () => {
       const { data, error } = await sb
-        .from("feedbacks")                            // ← テーブル名を合わせてください
+        .from("feedbacks") // ← テーブル名に合わせてください
         .select(`
           id,
           rating,
@@ -71,6 +77,7 @@ export default function CompanyFeedbackPage() {
           jobs(title, name),
           profiles(full_name)
         `)
+        .eq("company_id", companyId)
         .order("created_at", { ascending: false })
 
       if (error) {
@@ -95,7 +102,7 @@ export default function CompanyFeedbackPage() {
     }
 
     fetchFeedbacks()
-  }, [])
+  }, [companyId])
 
   const filteredAndSortedFeedbacks = useMemo(() => {
     const filtered = feedbacks.filter((feedback) => {
@@ -185,7 +192,13 @@ export default function CompanyFeedbackPage() {
             <Download className="h-4 w-4 mr-2" />
             エクスポート
           </Button>
-          <Button onClick={() => (window.location.href = "/company/feedback/create/template")}>
+          <Button
+            onClick={() =>
+              (window.location.href = companyId
+                ? `/company/${companyId}/feedback/create/template`
+                : "/company/feedback/create/template")
+            }
+          >
             <Plus className="w-4 h-4 mr-2" />
             新規フィードバック作成
           </Button>
@@ -414,14 +427,22 @@ export default function CompanyFeedbackPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => (window.location.href = `/company/feedback/${feedback.id}/edit`)}
+                          onClick={() =>
+                            (window.location.href = companyId
+                              ? `/company/${companyId}/feedback/${feedback.id}/edit`
+                              : `/company/feedback/${feedback.id}/edit`)
+                          }
                         >
                           編集
                         </Button>
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => (window.location.href = `/company/feedback/${feedback.id}`)}
+                          onClick={() =>
+                            (window.location.href = companyId
+                              ? `/company/${companyId}/feedback/${feedback.id}`
+                              : `/company/feedback/${feedback.id}`)
+                          }
                         >
                           詳細
                         </Button>

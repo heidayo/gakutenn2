@@ -19,10 +19,9 @@ import {
   Calendar,
   Paperclip,
   Send,
-  Phone,
-  Video,
 } from "lucide-react"
 import Link from "next/link"
+import { useParams } from "next/navigation"
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
 
@@ -30,6 +29,9 @@ export default function CompanyMessagesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [selectedChat, setSelectedChat] = useState<string | null>(null)
+
+  const params = useParams<{ companyId: string }>()
+  const companyId = (params?.companyId ?? "") as string
 
   // ---------- Supabase‑backed state ----------
   interface MessageStats {
@@ -43,6 +45,7 @@ export default function CompanyMessagesPage() {
 
   interface ChatRoom {
     id: string
+    applicationId: string
     student: {
       name: string
       university: string
@@ -84,7 +87,7 @@ export default function CompanyMessagesPage() {
   const [newMessage, setNewMessage] = useState<string>("")
 
   const fetchMessages = async () => {
-    if (!selectedChat) return;
+    if (!selectedChat || !companyId) return;
     const { data: rows, error } = await supabase
       .from("messages")
       .select("id,sender,content,created_at,is_read,type")
@@ -124,13 +127,15 @@ export default function CompanyMessagesPage() {
     }
   };
 
-  // fetch chat rooms & stats once
+  // fetch chat rooms & stats once, but only if companyId is available
   useEffect(() => {
+    if (!companyId) return   // companyId 未取得時は実行しない
+
     const sb = supabase as any
 
     const loadRooms = async () => {
-      // ---- message stats (example RPC or aggregated view) ----
-      const { data: statRow } = await sb.rpc("company_message_stats") // ← 事前に用意していない場合は適宜変更
+      // ---- message stats ----
+      const { data: statRow } = await sb.rpc("company_message_stats", { p_company_id: companyId })
       if (statRow) {
         setMessageStats({
           total: statRow.total ?? 0,
@@ -142,54 +147,87 @@ export default function CompanyMessagesPage() {
         })
       }
 
-      // ---- chat rooms ----
-      const { data: rooms } = await sb
-        .from("company_chat_rooms_view")
-        .select(`
-          chat_room_id,
-          application_id,
-          job_title,
-          applicant_name,
-          application_title,
-          application_status,
-          unread_count,
-          last_message,
-          last_message_at
-        `)
-        .order("last_message_at", { ascending: false });
+      // ---- fetch related applications ----
+      const { data: apps, error: appsError } = await sb
+        .from("applications")
+        .select("id, title, status, name, job_id")
+        .eq("company_id", companyId);
+      if (appsError) {
+        console.error("応募情報取得エラー", appsError);
+        return;
+      }
+      const appIds = (apps ?? []).map((a: any) => a.id);
+      const jobIds = (apps ?? []).map((a: any) => a.job_id);
 
-      setChatRooms(
-        (rooms ?? []).map((r: any) => ({
-          id: r.chat_room_id,
+      // ---- fetch chat rooms ----
+      const { data: rooms, error: roomsError } = await sb
+        .from("chat_rooms")
+        .select("id, application_id")
+        .in("application_id", appIds);
+      if (roomsError) {
+        console.error("チャットルーム取得エラー", roomsError);
+        return;
+      }
+
+      // ---- fetch jobs ----
+      const { data: jobs, error: jobsError } = await sb
+        .from("jobs")
+        .select("id, title")
+        .in("id", jobIds);
+      if (jobsError) {
+        console.error("求人取得エラー", jobsError);
+        return;
+      }
+
+      // ---- fetch all messages ----
+      const { data: msgRows, error: msgError } = await sb
+        .from("messages")
+        .select("application_id, content, created_at, sender, is_read");
+      if (msgError) {
+        console.error("メッセージ取得エラー", msgError);
+      }
+
+      // ---- assemble chat room data ----
+      const enrichedRooms = rooms.map((r: any) => {
+        const app = apps.find((a: any) => a.id === r.application_id)!;
+        const userName = app.name;
+        const job = jobs.find((j: any) => j.id === app.job_id)!;
+        const relatedMsgs = (msgRows ?? []).filter((m: any) => m.application_id === r.application_id);
+        const sorted = relatedMsgs.sort((a: any, b: any) =>
+          new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        const lastMsg = sorted[0];
+
+        return {
+          id: r.id,
           applicationId: r.application_id,
           student: {
-            name: r.applicant_name,
-            avatar: r.applicant_name.charAt(0) ?? "?",
+            name: userName,
+            avatar: userName ? userName.charAt(0) : "",
             profileImage: null,
+            university: app.title,
           },
-          job: r.job_title,
-          lastMessage: r.last_message ?? "",
-          timestamp: new Date(r.last_message_at).toLocaleTimeString("ja-JP", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }),
-          unreadCount: r.unread_count ?? 0,
-          // The following fields are not available in the new view, so provide defaults or remove as needed
-          isRead: (r.unread_count ?? 0) === 0,
+          job: job.title,
+          lastMessage: lastMsg?.content ?? "",
+          timestamp: lastMsg
+            ? new Date(lastMsg.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
+            : "",
+          unreadCount: relatedMsgs.filter((m: any) => !m.is_read && m.sender === "student").length,
+          isRead: relatedMsgs.filter((m: any) => !m.is_read && m.sender === "student").length === 0,
           hasAttachment: false,
-          status: r.application_status ?? "面談調整中",
+          status: app.status,
           priority: "normal",
           isOnline: false,
           lastSeen: "",
-        }))
-      )
+        };
+      });
 
-      // set default selected chat
-      if (rooms && rooms.length > 0) setSelectedChat(rooms[0].chat_room_id)
+      setChatRooms(enrichedRooms);
+      if (enrichedRooms.length > 0) setSelectedChat(enrichedRooms[0].applicationId);
     }
 
     loadRooms()
-  }, [])
+  }, [companyId])
 
   // fetch messages for selected chat
   useEffect(() => {
@@ -232,7 +270,7 @@ export default function CompanyMessagesPage() {
     return matchesSearch && matchesStatus
   })
 
-  const selectedChatData = chatRooms.find((room) => room.id === selectedChat)
+  const selectedChatData = chatRooms.find((room) => room.applicationId === selectedChat)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -316,9 +354,9 @@ export default function CompanyMessagesPage() {
                   {filteredChatRooms.map((room) => (
                     <div
                       key={room.id}
-                      onClick={() => setSelectedChat(room.id)}
+                      onClick={() => setSelectedChat(room.applicationId)}
                       className={`p-3 rounded-lg cursor-pointer transition-colors border-l-4 ${getPriorityColor(room.priority)} ${
-                        selectedChat === room.id ? "bg-blue-50 border-r-2 border-r-blue-500" : "hover:bg-gray-50"
+                        selectedChat === room.applicationId ? "bg-blue-50 border-r-2 border-r-blue-500" : "hover:bg-gray-50"
                       }`}
                     >
                       <div className="flex items-start space-x-3">
@@ -390,9 +428,9 @@ export default function CompanyMessagesPage() {
                     .map((room) => (
                       <div
                         key={room.id}
-                        onClick={() => setSelectedChat(room.id)}
+                        onClick={() => setSelectedChat(room.applicationId)}
                         className={`p-3 rounded-lg cursor-pointer transition-colors border-l-4 border-l-red-500 ${
-                          selectedChat === room.id ? "bg-blue-50 border-r-2 border-r-blue-500" : "hover:bg-gray-50"
+                          selectedChat === room.applicationId ? "bg-blue-50 border-r-2 border-r-blue-500" : "hover:bg-gray-50"
                         }`}
                       >
                         <div className="flex items-start space-x-3">
@@ -442,20 +480,12 @@ export default function CompanyMessagesPage() {
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Link href={`/company/applications/${selectedChatData.id}`}>
+                    <Link href={companyId ? `/company/${companyId}/applications/${selectedChatData.applicationId}` : "#"}>
                       <Button variant="outline" size="sm">
                         <User className="h-4 w-4 mr-2" />
                         プロフィール
                       </Button>
                     </Link>
-                    <Button variant="outline" size="sm">
-                      <Phone className="h-4 w-4 mr-2" />
-                      通話
-                    </Button>
-                    <Button variant="outline" size="sm">
-                      <Video className="h-4 w-4 mr-2" />
-                      ビデオ通話
-                    </Button>
                     <Button variant="ghost" size="sm">
                       <MoreVertical className="h-4 w-4" />
                     </Button>
@@ -607,7 +637,7 @@ export default function CompanyMessagesPage() {
             </Card>
 
             <div className="space-y-3">
-              <Link href={`/company/applications/${selectedChatData.id}`}>
+              <Link href={companyId ? `/company/${companyId}/applications/${selectedChatData.applicationId}` : "#"}>
                 <Button className="w-full" variant="outline">
                   <User className="h-4 w-4 mr-2" />
                   詳細プロフィール

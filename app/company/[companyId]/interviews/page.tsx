@@ -31,6 +31,7 @@ import {
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
 import Link from "next/link"
+import { useParams } from "next/navigation"
 
 export default function CompanyInterviewsPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
@@ -42,6 +43,8 @@ export default function CompanyInterviewsPage() {
   const [selectedInterviews, setSelectedInterviews] = useState<number[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(new Date())
+  const params = useParams<{ companyId: string }>()
+  const companyId = (params?.companyId ?? "") as string
 
   // 面談データ (Supabase から取得)
   interface Interview {
@@ -63,12 +66,14 @@ export default function CompanyInterviewsPage() {
 
   const [interviews, setInterviews] = useState<Interview[]>([])
 
-  // データ取得
+  // データ取得（companyIdが取得できてから実行、companyIdでフィルタ）
   useEffect(() => {
+    if (!companyId) return  // companyId 未取得時は何もしない
+
     const fetchInterviews = async () => {
       const sb = supabase as any
       const { data, error } = await sb
-        .from("interviews") // ← テーブル名を実際に合わせて修正
+        .from("interviews")
         .select(`
           id,
           date,
@@ -86,6 +91,7 @@ export default function CompanyInterviewsPage() {
           profiles!inner(id, full_name),
           jobs(title)
         `)
+        .eq("company_id", companyId)
         .order("date")
 
       if (error) {
@@ -114,7 +120,7 @@ export default function CompanyInterviewsPage() {
     }
 
     fetchInterviews()
-  }, [])
+  }, [companyId])
 
   // 面談枠設定
   const [timeSlots, setTimeSlots] = useState([
@@ -474,7 +480,7 @@ export default function CompanyInterviewsPage() {
                           ) : interview.status === "完了" ? (
                             <div className="flex items-center space-x-2">
                               {interview.evaluation && <Badge variant="outline">評価: {interview.evaluation}</Badge>}
-                              <Link href={`/company/applications/${interview.applicantId}`}>
+                              <Link href={companyId ? `/company/${companyId}/applications/${interview.applicantId}` : "#"}>
                                 <Button size="sm" variant="outline">
                                   <Eye className="h-4 w-4 mr-1" />
                                   詳細

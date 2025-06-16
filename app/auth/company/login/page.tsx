@@ -58,24 +58,24 @@ export default function CompanyLoginPage() {
           throw new Error(authErr?.message || "メールアドレスまたはパスワードが正しくありません。")
         }
 
-        // ユーザーに紐づく企業レコードを取得
+        // ユーザーに紐づく企業IDを companies テーブルから取得
         const { data: company, error: compErr } = await supabase
           .from("companies")
           .select("id")
           .eq("user_id", user.id)
-          .single()
+          .single();
 
         if (compErr || !company) {
-          throw new Error("このアカウントに紐づく企業が見つかりません。")
+          throw new Error("このアカウントに紐づく企業が見つかりません。");
         }
 
         toast({
           title: "ログイン成功！",
           description: "企業ダッシュボードへ移動します。",
           variant: "default",
-        })
+        });
 
-        router.push(`/company/${company.id}/dashboard`)
+        router.push(`/company/${company.id}/dashboard`);
       }
     } catch (err: any) {
       toast({
