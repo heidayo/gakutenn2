@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect } from "react"
+import { useParams } from 'next/navigation'
 import { supabase } from "@/lib/supabase/client"
 
 /** Local type for rows from company_chat_rooms_view */
@@ -41,7 +42,9 @@ import {
 import Link from "next/link"
 import { useState } from "react"
 
-export default function ChatPage({ params }: { params: { id: string } }) {
+export default function ChatPage() {
+  const params = useParams()
+  const roomId = params.id as string
   const [message, setMessage] = useState("")
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
   const [selectedTime, setSelectedTime] = useState("")
@@ -53,6 +56,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   const [applicationId, setApplicationId] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!roomId) return
     async function fetchChatRooms() {
       setLoading(true)
       const { data: room, error } = await supabase
@@ -63,37 +67,43 @@ export default function ChatPage({ params }: { params: { id: string } }) {
           created_at,
           applications!chat_rooms_application_id_fkey (
             status,
-            companies!applications_company_id_fkey (
-              name
-            ),
+            next_step,
+            next_date,
             jobs!applications_job_id_fkey (
-              title
+              title,
+              companies!jobs_company_id_fkey (
+                name
+              )
             )
           )
         `)
-        .eq('id', Number(params.id))
+        .eq('id', Number(roomId))
         .single()
 
       if (error || !room) {
         console.error('chat rooms fetch error:', error)
       } else {
         setApplicationId(room.application_id)
-        setChatRooms([{
+        const mapped = [{
           chat_room_id: room.id.toString(),
           application_id: room.application_id,
           application_status: room.applications?.status ?? null,
-          company_name: room.applications?.companies?.name ?? "",
+          company_name: room.applications?.jobs?.companies?.name ?? "",
           job_title: room.applications?.jobs?.title ?? "",
           last_message: "",    // placeholder
           last_message_at: "", // placeholder
           unread_count: null,  // placeholder
-        }])
+        }]
+        console.log("mapped chatRooms:", mapped)
+        setChatRooms(mapped)
+        // Immediately after setChatRooms, chatRooms state is not updated yet, so log mapped here.
+        console.log("chatRooms fetched from Supabase:", mapped)
       }
       setLoading(false)
     }
 
     fetchChatRooms()
-  }, [params.id])
+  }, [roomId])
 
   /** Local type for rows from messages table */
   type MessageRow = {
@@ -107,12 +117,13 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   }
 
   useEffect(() => {
+    if (!roomId) return
     async function fetchMessages() {
       // chat_rooms テーブルから application_id を取得
       const { data: room, error: roomError } = await supabase
         .from('chat_rooms')
         .select('application_id')
-        .eq('id', Number(params.id))
+        .eq('id', Number(roomId))
         .single()
 
       if (roomError || !room) {
@@ -136,7 +147,7 @@ export default function ChatPage({ params }: { params: { id: string } }) {
       }
     }
     fetchMessages()
-  }, [params.id])
+  }, [roomId])
 
   useEffect(() => {
     if (!applicationId) return
@@ -170,6 +181,10 @@ export default function ChatPage({ params }: { params: { id: string } }) {
   const jobTitle = currentRoom.job_title ?? "";
   const companyLogo = companyName.charAt(0) ?? "";
   const companyStatus = currentRoom.application_status ?? "";
+
+  // Debug logs for derived data
+  console.log("currentRoom:", currentRoom)
+  console.log("companyName:", companyName)
 
   const timeSlots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"]
 
@@ -230,21 +245,12 @@ export default function ChatPage({ params }: { params: { id: string } }) {
             <Link href="/student/messages">
               <ArrowLeft className="h-6 w-6 text-gray-600" />
             </Link>
-            <div className="flex items-center space-x-3">
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-sm">{companyLogo}</span>
-              </div>
-              <div>
-                <div className="flex items-center space-x-2">
-                  <Building2 className="h-4 w-4 text-gray-500" />
-                  <span className="font-semibold text-sm">{companyName}</span>
-                </div>
-                <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 mt-1">
-                  {companyStatus}
-                </Badge>
-                {/* Optionally display job title */}
-                <div className="text-xs text-gray-600 mt-1">{jobTitle}</div>
-              </div>
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
+              <span className="text-white font-bold text-sm">{companyLogo}</span>
+            </div>
+            <div>
+              <span className="text-lg font-semibold text-gray-900">{jobTitle}</span>
+              <p className="text-sm text-gray-600">{companyName}</p>
             </div>
           </div>
           <div className="flex items-center space-x-2">
