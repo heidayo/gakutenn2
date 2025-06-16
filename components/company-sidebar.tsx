@@ -64,12 +64,15 @@ export function CompanySidebar() {
       if (!user) return;
 
       // 企業名を取得
-      const { data: company } = await supabase
+      const { data: company, error: companyError } = await supabase
         .from("companies")
         .select("name")
-        .eq("admin_user_id", user.id)
+        .eq("user_id", user.id)
         .single();
-      if (company?.name) setCompanyName(company.name);
+      if (companyError) console.error("Error fetching company:", companyError);
+      if (company?.name) {
+        setCompanyName(company.name);
+      }
 
       // ユーザー氏名を取得
       const { data: profile } = await supabase

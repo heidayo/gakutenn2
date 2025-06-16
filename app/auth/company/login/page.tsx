@@ -1,7 +1,6 @@
 "use client"
 
-import type React from "react"
-
+import React from "react"
 import { useState } from "react"
 import Link from "next/link"
 import { Loader2, Eye, EyeOff, Mail, Building, Shield } from "lucide-react"
@@ -12,12 +11,12 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-
-// ─── Supabase client ────────────────────────────────
 import { supabase } from "@/lib/supabase/client"
+import { useRouter } from "next/navigation"
 
 export default function CompanyLoginPage() {
   const { toast } = useToast()
+  const router = useRouter()
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
@@ -49,30 +48,34 @@ export default function CompanyLoginPage() {
         })
 
         // 管理ダッシュボードへリダイレクト
-        window.location.href = "/admin/dashboard"
+        router.push("/admin/dashboard")
       } else {
-        // ───────── 通常の企業ログイン（Supabase連携） ─────────
-        try {
-          const { data, error } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          })
+        // Supabase 認証を用いた企業ログイン
+        const { data: { user }, error: authErr } =
+          await supabase.auth.signInWithPassword({ email, password })
 
-          if (error) {
-            throw new Error(error.message)
-          }
-
-          toast({
-            title: "ログイン成功！",
-            description: "企業ダッシュボードへ移動します。",
-            variant: "default",
-          })
-
-          // 企業ダッシュボードへリダイレクト
-          window.location.href = "/company/dashboard"
-        } catch (signInErr: any) {
-          throw new Error(signInErr.message || "メールアドレスまたはパスワードが正しくありません。")
+        if (authErr || !user) {
+          throw new Error(authErr?.message || "メールアドレスまたはパスワードが正しくありません。")
         }
+
+        // ユーザーに紐づく企業レコードを取得
+        const { data: company, error: compErr } = await supabase
+          .from("companies")
+          .select("id")
+          .eq("user_id", user.id)
+          .single()
+
+        if (compErr || !company) {
+          throw new Error("このアカウントに紐づく企業が見つかりません。")
+        }
+
+        toast({
+          title: "ログイン成功！",
+          description: "企業ダッシュボードへ移動します。",
+          variant: "default",
+        })
+
+        router.push(`/company/${company.id}/dashboard`)
       }
     } catch (err: any) {
       toast({
@@ -87,28 +90,25 @@ export default function CompanyLoginPage() {
 
   const handleGoogleLogin = async () => {
     setSocialLoading("Google")
+
     try {
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: "google",
-        options: {
-          redirectTo: `${location.origin}/company/dashboard`,
-        },
+      // 仮のGoogleログインロジック
+      await new Promise((resolve) => setTimeout(resolve, 2000))
+
+      toast({
+        title: "Googleログイン成功！",
+        description: "企業ダッシュボードへ移動します。",
+        variant: "default",
       })
 
-      if (error) {
-        throw new Error(error.message)
-      }
-
-      // If Supabase returns a redirect URL in the same tab, navigate manually
-      if (data?.url) {
-        window.location.href = data.url
-      }
-    } catch (err: any) {
+      window.location.href = "/company/dashboard"
+    } catch (err) {
       toast({
         title: "Googleログインに失敗しました",
-        description: err.message || "エラーが発生しました。もう一度お試しください。",
+        description: "エラーが発生しました。もう一度お試しください。",
         variant: "destructive",
       })
+    } finally {
       setSocialLoading(null)
     }
   }

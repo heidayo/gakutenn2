@@ -60,7 +60,7 @@ export default function LandingPage() {
 
         // ----- 応募総数取得 -----
         const { count: appsCount, error: appsErr } = await supabase
-          .from("student_applications")
+          .from("applications")
           .select("id", { count: "exact", head: true })
           .eq("email", email)
 
@@ -68,7 +68,7 @@ export default function LandingPage() {
 
         // ----- 面談予定数取得 -----
         const { count: interviewsCount, error: interviewsErr } = await supabase
-          .from("student_applications")
+          .from("applications")
           .select("id", { count: "exact", head: true })
           .eq("email", email)
           .eq("status", "面談予定")
