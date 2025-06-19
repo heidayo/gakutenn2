@@ -29,6 +29,7 @@ export default function JobApplicationPage({ params }: { params: { id: string } 
     salary: number | null;
     salary_type: string | null;
     duration: string | null;
+    companies: { name: string } | null;
   };
   const [job, setJob] = useState<Job | null>(null);
 
@@ -36,7 +37,7 @@ export default function JobApplicationPage({ params }: { params: { id: string } 
     const fetchJob = async () => {
       const { data, error } = await supabase
         .from("jobs")
-        .select("id, title, publish_date, salary, salary_type, duration")
+        .select("id, title, publish_date, salary, salary_type, duration, companies(name)")
         .eq("id", params.id)
         .single();
       if (error) {
@@ -147,12 +148,9 @@ export default function JobApplicationPage({ params }: { params: { id: string } 
             <div className="flex items-center space-x-3 mb-3">
               <Building2 className="h-5 w-5 text-gray-500" />
               <div>
+                <p className="text-sm text-gray-500">{job.companies?.name}</p>
                 <h2 className="font-semibold">{job.title}</h2>
               </div>
-            </div>
-            <div className="flex items-center space-x-4 text-sm text-gray-600">
-              <span>{job.salary !== null ? `¥${job.salary.toLocaleString()}` : "―"}</span>
-              <span>{job.duration ?? "―"}</span>
             </div>
           </CardContent>
         </Card>

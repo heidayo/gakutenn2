@@ -27,6 +27,7 @@ import {
   Building2,
 } from "lucide-react"
 import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase/client"
 import Link from "next/link"
 
 export default function StudentInterviewsPage() {
@@ -39,70 +40,51 @@ export default function StudentInterviewsPage() {
   const [lastUpdated, setLastUpdated] = useState(new Date())
 
   // 面談データ
-  const [interviews, setInterviews] = useState([
-    {
-      id: 1,
-      company: "株式会社テックスタート",
-      companyLogo: "T",
-      job: "Webマーケティングアシスタント",
-      date: "2024年6月5日",
-      time: "14:00-15:00",
-      type: "オンライン",
-      status: "確定",
-      interviewer: "佐藤マネージャー",
-      meetingLink: "https://meet.example.com/abc123",
-      meetingId: "123-456-789",
-      notes: "履歴書とポートフォリオを準備してください",
-      reminders: ["1日前", "1時間前"],
-      canReschedule: true,
-      preparation: ["履歴書の最新版を準備", "志望動機を整理", "質問事項をリストアップ", "ネット環境の確認"],
-    },
-    {
-      id: 2,
-      company: "イノベーション株式会社",
-      companyLogo: "I",
-      job: "データ分析補助",
-      date: "2024年6月7日",
-      time: "16:30-17:30",
-      type: "対面",
-      status: "予定",
-      interviewer: "田中部長",
-      location: "東京都渋谷区○○ビル 5F",
-      address: "東京都渋谷区渋谷1-1-1",
-      notes: "筆記用具をお持ちください",
-      canReschedule: true,
-      preparation: ["会社の事業内容を調査", "データ分析の基礎知識を復習", "筆記用具の準備", "交通手段の確認"],
-    },
-    {
-      id: 3,
-      company: "クリエイティブ合同会社",
-      companyLogo: "C",
-      job: "SNS運用サポート",
-      date: "2024年6月3日",
-      time: "10:00-11:00",
-      type: "オンライン",
-      status: "完了",
-      interviewer: "鈴木リーダー",
-      meetingLink: "https://meet.example.com/def456",
-      feedback: "とても良い印象でした。次のステップに進んでいただきます。",
-      rating: 4.8,
-      canReschedule: false,
-    },
-    {
-      id: 4,
-      company: "マーケティングプロ",
-      companyLogo: "M",
-      job: "市場調査アシスタント",
-      date: "2024年6月8日",
-      time: "13:00-14:00",
-      type: "電話",
-      status: "キャンセル",
-      interviewer: "高橋マネージャー",
-      phone: "03-1234-5678",
-      cancelReason: "企業都合により延期",
-      canReschedule: true,
-    },
-  ])
+  const [interviews, setInterviews] = useState<any[]>([])
+  const fetchInterviews = async () => {
+    setIsLoading(true)
+    const { data, error } = await supabase
+      .from("interviews")
+      .select(
+        `
+      id,
+      date,
+      start_time,
+      end_time,
+      type,
+      status,
+      interviewer,
+      meeting_link,
+      location,
+      notes,
+      evaluation,
+      company:companies(name),
+      job:jobs(title)
+    `
+      )
+    if (error) {
+      console.error("Error fetching interviews:", error)
+    } else if (data) {
+      setInterviews(
+        data.map((i) => ({
+          id: i.id,
+          company: i.company?.name,        // joined company name
+          job: i.job?.title,               // joined job title
+          date: new Date(i.date).toLocaleDateString("ja-JP"),
+          time: `${i.start_time}-${i.end_time}`,
+          type: i.type,
+          status: i.status,
+          interviewer: i.interviewer || "",
+          meetingLink: i.meeting_link || undefined,
+          location: i.location || undefined,
+          notes: i.notes || undefined,
+          feedback: i.evaluation || undefined,
+          canReschedule: i.status !== "完了",
+        }))
+      )
+    }
+    setIsLoading(false)
+  }
 
   // フィルタリング
   const filteredInterviews = interviews.filter((interview) => {
@@ -125,7 +107,12 @@ export default function StudentInterviewsPage() {
     today: interviews.filter((i) => i.date === "2024年6月5日").length,
   }
 
-  // 自動更新
+  // fetch on mount
+  useEffect(() => {
+    fetchInterviews()
+  }, [])
+
+  // auto-refresh lastUpdated timestamp (unchanged)
   useEffect(() => {
     const interval = setInterval(() => {
       setLastUpdated(new Date())
@@ -134,10 +121,7 @@ export default function StudentInterviewsPage() {
   }, [])
 
   const handleRefresh = async () => {
-    setIsLoading(true)
-    await new Promise((resolve) => setTimeout(resolve, 1000))
-    setLastUpdated(new Date())
-    setIsLoading(false)
+    await fetchInterviews()
   }
 
   const handleReschedule = (id: number) => {
@@ -490,7 +474,7 @@ export default function StudentInterviewsPage() {
                           <div key={interview.id} className="p-3 border rounded-lg">
                             <div className="flex items-center justify-between mb-2">
                               <h4 className="font-semibold text-sm">{interview.company}</h4>
-                              <Badge className={getStatusColor(interview.status)} size="sm">
+                              <Badge className={getStatusColor(interview.status)}>
                                 {interview.status}
                               </Badge>
                             </div>
@@ -538,7 +522,7 @@ export default function StudentInterviewsPage() {
                         <div className="space-y-3">
                           <h4 className="font-semibold text-sm">面談準備チェックリスト</h4>
                           <div className="space-y-2">
-                            {interview.preparation.map((item, index) => (
+                            {interview.preparation.map((item: string, index: number) => (
                               <div key={index} className="flex items-center space-x-2">
                                 <input type="checkbox" className="rounded" />
                                 <span className="text-sm">{item}</span>

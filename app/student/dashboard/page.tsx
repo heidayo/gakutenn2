@@ -46,7 +46,7 @@ export default function StudentDashboardPage() {
 
       // ── Applications & status counts ─────────────────────
       const { data: apps } = await supabase
-        .from("student_applications")
+        .from("applications")
         .select("status")
         .eq("user_id", userId);
 
@@ -78,24 +78,32 @@ export default function StudentDashboardPage() {
       }
 
       // ── Interviews ──────────────────────────────────────
-      const { data: iv } = await supabase
+      const { data: iv, error: ivError } = await supabase
         .from("interviews")
-        .select("company, role, scheduled_at, type")
-        .eq("student_id", userId)
-        .gte("scheduled_at", new Date().toISOString())
-        .order("scheduled_at");
+        .select(
+          `
+            date,
+            start_time,
+            end_time,
+            type,
+            company:companies(name),
+            job:jobs(title)
+          `
+        )
+        .eq("applicant_id", userId)
+        .neq("status", "完了")
+        .order("date", { ascending: true });
 
-      if (iv) {
+      if (ivError) {
+        console.error("Error fetching upcoming interviews:", ivError);
+      } else if (iv) {
         setUpcomingInterviews(
-          iv.map(i => ({
-            company: i.company,
-            role: i.role,
-            date: new Date(i.scheduled_at).toLocaleDateString("ja-JP"),
-            time: new Date(i.scheduled_at).toLocaleTimeString("ja-JP", {
-              hour: "2-digit",
-              minute: "2-digit",
-            }),
-            type: i.type ?? "面談",
+          iv.map((i) => ({
+            company: i.company?.name || "",
+            role: i.job?.title || "",
+            date: new Date(i.date).toLocaleDateString("ja-JP"),
+            time: i.start_time,
+            type: `${i.type}面談`,
           }))
         );
       }
@@ -207,29 +215,39 @@ export default function StudentDashboardPage() {
         {/* Upcoming Interviews */}
         <Card>
           <CardHeader>
-            <CardTitle className="text-base flex items-center">
-              <Calendar className="h-4 w-4 mr-2" />
-              面談予定
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-base flex items-center">
+                <Calendar className="h-4 w-4 mr-2" />
+                面談予定
+              </CardTitle>
+              <Link href="/student/interviews">
+                <Button variant="ghost" size="sm" className="text-blue-600">
+                  すべて見る
+                  <ChevronRight className="ml-1 h-4 w-4" />
+                </Button>
+              </Link>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             {upcomingInterviews.map((interview, index) => (
-              <div key={index} className="border rounded-lg p-3 bg-blue-50">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h4 className="font-semibold text-sm">{interview.role}</h4>
-                    <p className="text-sm text-gray-600">{interview.company}</p>
-                    <div className="flex items-center space-x-4 mt-2 text-xs text-gray-600">
-                      <span>{interview.date}</span>
-                      <span>{interview.time}</span>
-                      <Badge variant="outline" className="text-xs">
-                        {interview.type}
-                      </Badge>
+              <Link key={index} href="/student/interviews" className="block">
+                <div className="border rounded-lg p-3 bg-blue-50 hover:bg-blue-100">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-sm">{interview.role}</h4>
+                      <p className="text-sm text-gray-600">{interview.company}</p>
+                      <div className="flex items-center space-x-4 mt-2 text-xs text-gray-600">
+                        <span>{interview.date}</span>
+                        <span>{interview.time}</span>
+                        <Badge variant="outline" className="text-xs">
+                          {interview.type}
+                        </Badge>
+                      </div>
                     </div>
+                    <AlertCircle className="h-4 w-4 text-orange-500" />
                   </div>
-                  <AlertCircle className="h-4 w-4 text-orange-500" />
                 </div>
-              </div>
+              </Link>
             ))}
             {upcomingInterviews.length === 0 && (
               <p className="text-sm text-gray-500 text-center py-4">現在予定されている面談はありません</p>

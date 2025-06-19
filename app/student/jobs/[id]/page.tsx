@@ -33,11 +33,12 @@ type JobDetail = JobRow & {
     title: string
     duration: string
     description: string
-  }[]
-  mentor_name: string | null
-  mentor_role: string | null
-  mentor_experience: string | null
-  mentor_message: string | null
+  }[],
+  mentor_name: string | null,
+  mentor_role: string | null,
+  mentor_experience: string | null,
+  mentor_message: string | null,
+  company: { name: string } | null,
 }
 
 export default function JobDetailPage() {
@@ -51,7 +52,7 @@ export default function JobDetailPage() {
     const fetchJob = async () => {
       const { data, error } = await supabase
         .from("jobs")
-        .select("*")
+        .select("*, company:companies(name)")
         .eq("id", id as string)
         .single<JobDetail>()
       if (error) {
@@ -109,7 +110,7 @@ export default function JobDetailPage() {
                     <span className="text-white font-bold text-sm">{job.category.charAt(0)}</span>
                   </div>
                   <Building2 className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">{job.category}</span>
+                  <span className="text-sm text-gray-600">{job.company?.name}</span>
                 </div>
                 <h1 className="text-xl font-bold mb-3">{job.title}</h1>
                 <div className="flex items-center space-x-4 text-sm text-gray-600 mb-3">
