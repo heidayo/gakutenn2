@@ -37,14 +37,22 @@ export default function FeedbackListPage() {
 
   useEffect(() => {
     const fetchFeedbacks = async () => {
-      // ① 現在ログインしているユーザーを取得
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      // ① 認証セッションを取得
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      if (sessionError) {
+        console.error('session fetch error', sessionError);
+        return;
+      }
+      const user = session?.user;
+      if (!user) {
+        console.error('No logged-in user');
+        return;
+      }
 
       // ② フィードバック一覧を取得（テーブル名・カラムはスキーマに合わせて調整）
       const { data, error } = await supabase
-        .from("student_feedbacks")         // ★テーブル名を合わせてください
-        .select("*")
+        .from("feedbacks")
+        .select("*, company:companies(name)")
         .eq("student_id", user.id);
 
       if (error) {
@@ -55,7 +63,7 @@ export default function FeedbackListPage() {
       // ③ UI 用に整形
       const formatted = (data ?? []).map((f: any) => ({
         id: f.id,
-        company: f.company_name,
+        company: f.company?.name ?? "",
         role: f.role,
         rating: f.rating,
         date: f.feedback_date,            // 例: "2025-06-01"

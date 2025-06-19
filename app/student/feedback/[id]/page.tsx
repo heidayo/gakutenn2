@@ -23,35 +23,41 @@ import {
   Award,
 } from "lucide-react"
 import Link from "next/link"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { supabase } from '@/lib/supabase/client'
+import { useParams } from 'next/navigation'
 
-export default function FeedbackDetailPage({ params }: { params: { id: string } }) {
+export default function FeedbackDetailPage() {
   const [learningNote, setLearningNote] = useState("")
   const [showResumeDialog, setShowResumeDialog] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
+  const [feedback, setFeedback] = useState<any>(null)
+  const params = useParams();
+  // Next.js useParams returns string | string[] | undefined, so cast to string
+  const id = Array.isArray(params.id) || !params.id ? '' : params.id;
 
-  const feedback = {
-    id: 1,
-    company: "株式会社テックスタート",
-    role: "Webマーケティングアシスタント",
-    rating: 4.5,
-    date: "2024年5月28日",
-    duration: "2週間",
-    category: "マーケティング",
-    interviewer: "田中 マネージャー",
-    isNew: true,
-    companyComment:
-      "田中さんは非常に積極的に業務に取り組んでいただきました。特にデータ分析の分野で顕著な成長が見られ、Excel の高度な機能を短期間で習得されました。また、チームメンバーとのコミュニケーションも円滑で、質問も的確でした。今後はプレゼンテーション力を向上させることで、さらに活躍の幅が広がると思います。マーケティング分野での継続的な学習をお勧めします。",
-    strengths: ["データ分析スキル", "積極性", "コミュニケーション力", "学習意欲"],
-    improvements: ["プレゼンテーション力", "戦略的思考", "リーダーシップ"],
-    skills: [
-      { name: "Excel", before: 2, after: 4 },
-      { name: "データ分析", before: 1, after: 3 },
-      { name: "マーケティング基礎", before: 2, after: 3 },
-    ],
-    existingLearningNote:
-      "データ分析の重要性を実感しました。特にExcelのピボットテーブルやVLOOKUP関数を実際の業務で使えるようになったのは大きな成果です。",
+  useEffect(() => {
+    const fetchFeedback = async () => {
+      const { data, error } = await supabase
+        .from('feedbacks')
+        .select(`*, company:companies(name), template_id`)
+        .eq('id', id)
+        .single()
+      if (error) {
+        console.error('Error fetching feedback:', error)
+      } else {
+        setFeedback(data)
+      }
+    }
+    fetchFeedback()
+  }, [id])
+
+  if (!feedback) {
+    return <div className="p-4">Loading...</div>
   }
+
+  // JSONBから各プロパティを取り出し
+  const { ratings = {}, comments = {}, overall_rating, overall_comment } = feedback
 
   const handleSaveLearningNote = () => {
     // 学びメモ保存処理
@@ -124,7 +130,7 @@ export default function FeedbackDetailPage({ params }: { params: { id: string } 
               <div className="flex-1">
                 <div className="flex items-center space-x-2 mb-2">
                   <Building2 className="h-4 w-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">{feedback.company}</span>
+                  <span className="text-sm text-gray-600">{feedback.company.name}</span>
                   {feedback.isNew && <Badge className="bg-red-500 text-white text-xs px-1.5 py-0.5">NEW</Badge>}
                 </div>
                 <h1 className="text-xl font-bold mb-2">{feedback.role}</h1>
@@ -140,8 +146,8 @@ export default function FeedbackDetailPage({ params }: { params: { id: string } 
                 </div>
               </div>
               <div className="text-center">
-                <div className="flex items-center space-x-1 mb-1">{renderStars(feedback.rating)}</div>
-                <div className="text-2xl font-bold text-yellow-600">{feedback.rating}</div>
+                <div className="flex items-center space-x-1 mb-1">{renderStars(overall_rating)}</div>
+                <div className="text-2xl font-bold text-yellow-600">{overall_rating}</div>
               </div>
             </div>
             <div className="flex items-center space-x-4">
@@ -161,7 +167,7 @@ export default function FeedbackDetailPage({ params }: { params: { id: string } 
           </CardHeader>
           <CardContent>
             <div className="bg-blue-50 p-4 rounded-lg">
-              <p className="text-sm leading-relaxed">{feedback.companyComment}</p>
+              <p className="text-sm leading-relaxed">{overall_comment}</p>
             </div>
           </CardContent>
         </Card>
@@ -177,7 +183,7 @@ export default function FeedbackDetailPage({ params }: { params: { id: string } 
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {feedback.strengths.map((strength, index) => (
+                {ratings.strengths?.map((strength: string, index: number) => (
                   <Badge key={index} className="bg-green-100 text-green-800">
                     {strength}
                   </Badge>
@@ -195,7 +201,7 @@ export default function FeedbackDetailPage({ params }: { params: { id: string } 
             </CardHeader>
             <CardContent>
               <div className="flex flex-wrap gap-2">
-                {feedback.improvements.map((improvement, index) => (
+                {ratings.improvements?.map((improvement: string, index: number) => (
                   <Badge key={index} variant="outline" className="border-orange-200 text-orange-700">
                     {improvement}
                   </Badge>
@@ -214,7 +220,7 @@ export default function FeedbackDetailPage({ params }: { params: { id: string } 
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {feedback.skills.map((skill, index) => (
+            {ratings.skills?.map((skill: { name: string; before: number; after: number }, index: number) => (
               <div key={index}>{renderSkillProgress(skill)}</div>
             ))}
           </CardContent>
@@ -229,9 +235,9 @@ export default function FeedbackDetailPage({ params }: { params: { id: string } 
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {feedback.existingLearningNote && (
+            {comments.existingLearningNote && (
               <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-sm text-gray-700">{feedback.existingLearningNote}</p>
+                <p className="text-sm text-gray-700">{comments.existingLearningNote}</p>
               </div>
             )}
             <div className="space-y-2">
@@ -287,16 +293,16 @@ export default function FeedbackDetailPage({ params }: { params: { id: string } 
                   <strong>職種:</strong> {feedback.role}
                 </p>
                 <p>
-                  <strong>企業:</strong> {feedback.company}
+                  <strong>企業:</strong> {feedback.company.name}
                 </p>
                 <p>
                   <strong>期間:</strong> {feedback.duration}
                 </p>
                 <p>
-                  <strong>評価:</strong> ★{feedback.rating}
+                  <strong>評価:</strong> ★{overall_rating}
                 </p>
                 <p>
-                  <strong>学び:</strong> {feedback.existingLearningNote || learningNote}
+                  <strong>学び:</strong> {comments.existingLearningNote || learningNote}
                 </p>
               </div>
             </div>
