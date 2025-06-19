@@ -163,121 +163,67 @@ export type Database = {
         }
         Relationships: []
       }
-      feedback_templates: {
+      feedbacks: {
         Row: {
-          category: string
+          comments: Json
           company_id: string
-          created_at: string | null
-          created_by: string | null
-          default_comments: Json | null
-          description: string | null
-          evaluation_criteria: Json
+          created_at: string
           id: string
-          is_active: boolean | null
-          name: string
-          updated_at: string | null
-          usage_count: number | null
+          job_id: string | null
+          overall_comment: string
+          overall_rating: number
+          ratings: Json
+          student_id: string
+          template_id: string
+          updated_at: string
         }
         Insert: {
-          category: string
+          comments: Json
           company_id: string
-          created_at?: string | null
-          created_by?: string | null
-          default_comments?: Json | null
-          description?: string | null
-          evaluation_criteria: Json
+          created_at?: string
           id?: string
-          is_active?: boolean | null
-          name: string
-          updated_at?: string | null
-          usage_count?: number | null
+          job_id?: string | null
+          overall_comment: string
+          overall_rating: number
+          ratings: Json
+          student_id: string
+          template_id: string
+          updated_at?: string
         }
         Update: {
-          category?: string
+          comments?: Json
           company_id?: string
-          created_at?: string | null
-          created_by?: string | null
-          default_comments?: Json | null
-          description?: string | null
-          evaluation_criteria?: Json
+          created_at?: string
           id?: string
-          is_active?: boolean | null
-          name?: string
-          updated_at?: string | null
-          usage_count?: number | null
+          job_id?: string | null
+          overall_comment?: string
+          overall_rating?: number
+          ratings?: Json
+          student_id?: string
+          template_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "feedback_templates_company_id_fkey"
+            foreignKeyName: "feedbacks_company_id_fkey"
             columns: ["company_id"]
             isOneToOne: false
             referencedRelation: "companies"
             referencedColumns: ["id"]
           },
-        ]
-      }
-      feedbacks: {
-        Row: {
-          assignee: string
-          attachments: Json | null
-          content: string
-          created_at: string | null
-          id: string
-          improvements: Json | null
-          internal_memo: string | null
-          internship_id: string
-          overall_comment: string | null
-          rating: number
-          scheduled_at: string | null
-          sent_at: string | null
-          status: string | null
-          strengths: Json | null
-          template_id: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          assignee: string
-          attachments?: Json | null
-          content: string
-          created_at?: string | null
-          id?: string
-          improvements?: Json | null
-          internal_memo?: string | null
-          internship_id: string
-          overall_comment?: string | null
-          rating: number
-          scheduled_at?: string | null
-          sent_at?: string | null
-          status?: string | null
-          strengths?: Json | null
-          template_id?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          assignee?: string
-          attachments?: Json | null
-          content?: string
-          created_at?: string | null
-          id?: string
-          improvements?: Json | null
-          internal_memo?: string | null
-          internship_id?: string
-          overall_comment?: string | null
-          rating?: number
-          scheduled_at?: string | null
-          sent_at?: string | null
-          status?: string | null
-          strengths?: Json | null
-          template_id?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
           {
-            foreignKeyName: "feedbacks_template_id_fkey"
-            columns: ["template_id"]
+            foreignKeyName: "feedbacks_job_id_fkey"
+            columns: ["job_id"]
             isOneToOne: false
-            referencedRelation: "feedback_templates"
+            referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "feedbacks_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
         ]
       }

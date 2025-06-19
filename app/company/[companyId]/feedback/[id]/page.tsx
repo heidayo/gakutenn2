@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase/client"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -44,6 +45,7 @@ interface Feedback {
   department: string
 }
 
+/*
 // サンプルデータ
 const sampleFeedback: Feedback = {
   id: "1",
@@ -77,6 +79,7 @@ const sampleFeedback: Feedback = {
   assignee: "山田花子",
   department: "開発部",
 }
+*/
 
 const statusConfig = {
   draft: { label: "下書き", color: "bg-gray-500", icon: FileText },
@@ -85,18 +88,126 @@ const statusConfig = {
 }
 
 export default function FeedbackDetailPage() {
-  const params = useParams()
+  const { id } = useParams() as { id: string | undefined }
   const router = useRouter()
+  if (!id) {
+    console.error("Feedback ID is missing in URL params")
+    router.back()
+    return null
+  }
   const [feedback, setFeedback] = useState<Feedback | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // 実際の実装では、APIからフィードバックデータを取得
-    setTimeout(() => {
-      setFeedback(sampleFeedback)
-      setLoading(false)
-    }, 500)
-  }, [params.id])
+    const fetchFeedback = async () => {
+      try {
+        const { data: fb, error: error1 } = await supabase
+          .from("feedbacks")
+          .select(`
+            id,
+            student_id,
+            template_id,
+            comments,
+            overall_comment,
+            overall_rating,
+            created_at,
+            updated_at,
+            job_id,
+            jobs!feedbacks_job_id_fkey ( title )
+          `)
+          .eq("id", id)
+          .single<{
+            id: string
+            student_id: string
+            template_id: string
+            comments: {
+              content: string
+              strengths: string[]
+              improvements: string[]
+            }
+            overall_comment: string
+            overall_rating: number
+            created_at: string
+            updated_at: string
+            job_id: string | null
+            jobs: { title: string } | null
+          }>()
+
+        if (error1) throw error1
+        if (!fb) return
+
+        // Fetch student separately
+        const { data: studentRecord, error: error2 } = await supabase
+          .from("students")
+          .select(`
+            user_id,
+            full_name,
+            email,
+            phone,
+            university,
+            faculty,
+            year,
+            avatar_url
+          `)
+          .eq("user_id", fb.student_id)
+          .single<{
+            user_id: string
+            full_name: string
+            email: string
+            phone: string
+            university: string
+            faculty: string
+            year: string
+            avatar_url?: string
+          }>()
+
+        if (error2) throw error2
+        if (!studentRecord) return
+
+        // Map student fields
+        const mappedStudent: Student = {
+          id: studentRecord.user_id,
+          name: studentRecord.full_name,
+          email: studentRecord.email,
+          phone: studentRecord.phone,
+          university: studentRecord.university,
+          major: studentRecord.faculty,
+          year: Number(studentRecord.year),
+          avatar: studentRecord.avatar_url || undefined,
+        }
+
+        // Derive jobName from joined jobs table
+        const jobName = fb.jobs?.title ?? '—'
+
+        // Destructure JSON columns, provide fallback for comments
+        const { comments: rawComments, overall_comment, overall_rating, created_at, updated_at } = fb
+        const comments = rawComments ?? { content: "", strengths: [], improvements: [] }
+
+        // Assemble feedback
+        setFeedback({
+          id: fb.id,
+          student: mappedStudent,
+          jobTitle: fb.template_id,           // or remove if unused
+          jobName: jobName,
+          rating: overall_rating,
+          status: "sent",                     // replace with actual status if stored
+          content: comments.content,
+          strengths: comments.strengths ?? [],
+          improvements: comments.improvements ?? [],
+          overallComment: overall_comment,
+          createdAt: new Date(created_at),
+          updatedAt: new Date(updated_at),
+          assignee: "",
+          department: "",
+        })
+      } catch (e) {
+        console.error("Error fetching feedback:", e)
+      } finally {
+        setLoading(false)
+      }
+    }
+    fetchFeedback()
+  }, [id])
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
@@ -217,20 +328,12 @@ export default function FeedbackDetailPage() {
             <CardContent className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="text-sm font-medium text-gray-600">職種</label>
-                  <p className="font-semibold">{feedback.jobTitle}</p>
-                </div>
-                <div>
                   <label className="text-sm font-medium text-gray-600">求人名</label>
                   <p className="font-semibold">{feedback.jobName}</p>
                 </div>
                 <div>
                   <label className="text-sm font-medium text-gray-600">担当者</label>
                   <p className="font-semibold">{feedback.assignee}</p>
-                </div>
-                <div>
-                  <label className="text-sm font-medium text-gray-600">部署</label>
-                  <p className="font-semibold">{feedback.department}</p>
                 </div>
               </div>
 

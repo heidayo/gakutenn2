@@ -16,20 +16,17 @@ import { ja } from "date-fns/locale"
 import type { DateRange } from "react-day-picker"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { addDays } from "date-fns"
+import Link from "next/link"
 
 type FeedbackStatus = "draft" | "sent" | "scheduled"
 
 interface Feedback {
-  id: string
-  studentName: string
-  jobTitle: string
-  jobName: string
-  rating: number
-  status: FeedbackStatus
-  createdAt: Date
-  updatedAt: Date
-  assignee: string
-  sentAt?: Date
+  id: string;
+  studentName: string;
+  overallRating: number;
+  overallComment: string;
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 
@@ -61,110 +58,64 @@ export default function CompanyFeedbackPage() {
   useEffect(() => {
     if (!companyId) return
 
-    const sb = supabase as any
-
     const fetchFeedbacks = async () => {
-      const { data, error } = await sb
-        .from("feedbacks") // ← テーブル名に合わせてください
-        .select(`
-          id,
-          rating,
-          status,
-          created_at,
-          updated_at,
-          sent_at,
-          assignee,
-          jobs(title, name),
-          profiles(full_name)
-        `)
-        .eq("company_id", companyId)
-        .order("created_at", { ascending: false })
-
-      if (error) {
-        console.error("feedback fetch error", error)
-        return
+      // フィードバックデータを取得（student_id 含む）
+      const { data: feedbackRows, error: feedbackError } = await supabase
+        .from('feedbacks')
+        .select('id, student_id, overall_rating, overall_comment, created_at, updated_at')
+        .eq('company_id', companyId)
+        .order('created_at', { ascending: false });
+      if (feedbackError) {
+        console.error('Feedback fetch error:', feedbackError);
+        return;
       }
 
+      // プロフィールから学生名を取得
+      const studentIds = feedbackRows?.map((f) => f.student_id) ?? [];
+      const { data: profilesRows, error: profilesError } = await supabase
+        .from('profiles')
+        .select('user_id, full_name')
+        .in('user_id', studentIds);
+      if (profilesError) {
+        console.error('Profiles fetch error:', profilesError);
+        return;
+      }
+
+      // 学生IDと名前のマップを作成
+      const profileMap = new Map<string, string>();
+      profilesRows.forEach((p) => {
+        const fullName = p.full_name ?? '';
+        profileMap.set(p.user_id, fullName);
+      });
+
+      // ステートをセット
       setFeedbacks(
-        (data ?? []).map((row: any) => ({
+        (feedbackRows ?? []).map((row: any) => ({
           id: row.id,
-          studentName: row.profiles.full_name,
-          jobTitle: row.jobs.title,
-          jobName: row.jobs.name,
-          rating: row.rating ?? 0,
-          status: row.status as FeedbackStatus,
+          studentName: profileMap.get(row.student_id) || '',
+          overallRating: row.overall_rating,
+          overallComment: row.overall_comment,
           createdAt: new Date(row.created_at),
           updatedAt: new Date(row.updated_at),
-          sentAt: row.sent_at ? new Date(row.sent_at) : undefined,
-          assignee: row.assignee ?? "-",
         }))
-      )
+      );
     }
 
     fetchFeedbacks()
   }, [companyId])
 
   const filteredAndSortedFeedbacks = useMemo(() => {
+    const term = searchTerm.toLowerCase();
     const filtered = feedbacks.filter((feedback) => {
-      const matchesSearch =
-        feedback.studentName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        feedback.jobName.toLowerCase().includes(searchTerm.toLowerCase())
-
-      const matchesStatus = statusFilter === "all" || feedback.status === statusFilter
-
-      const matchesRating =
-        ratingFilter === "all" ||
-        (ratingFilter === "4-5" && feedback.rating >= 4) ||
-        (ratingFilter === "3-3" && feedback.rating === 3) ||
-        (ratingFilter === "1-2" && feedback.rating <= 2)
-
-      // 期間フィルタ
-      let matchesDateRange = true
-      if (dateRange?.from) {
-        const targetDate = dateType === "created" ? feedback.createdAt : feedback.sentAt
-        if (!targetDate) {
-          matchesDateRange = false
-        } else {
-          const from = new Date(dateRange.from)
-          from.setHours(0, 0, 0, 0)
-
-          if (dateRange.to) {
-            const to = new Date(dateRange.to)
-            to.setHours(23, 59, 59, 999)
-            matchesDateRange = targetDate >= from && targetDate <= to
-          } else {
-            const fromDate = new Date(from)
-            fromDate.setHours(0, 0, 0, 0)
-            const toDate = new Date(from)
-            toDate.setHours(23, 59, 59, 999)
-            matchesDateRange = targetDate >= fromDate && targetDate <= toDate
-          }
-        }
-      }
-
-      return matchesSearch && matchesStatus && matchesRating && matchesDateRange
-    })
-
-    // 並び替え
-    filtered.sort((a, b) => {
-      switch (sortBy) {
-        case "createdAt-desc":
-          return b.createdAt.getTime() - a.createdAt.getTime()
-        case "sentAt-desc":
-          const aSentAt = a.sentAt?.getTime() || 0
-          const bSentAt = b.sentAt?.getTime() || 0
-          return bSentAt - aSentAt
-        case "rating-desc":
-          return b.rating - a.rating
-        case "studentName-asc":
-          return a.studentName.localeCompare(b.studentName, "ja")
-        default:
-          return 0
-      }
-    })
-
-    return filtered
-  }, [searchTerm, statusFilter, ratingFilter, sortBy, dateRange, dateType])
+      return (
+        feedback.studentName.toLowerCase().includes(term) ||
+        feedback.overallComment.toLowerCase().includes(term)
+      );
+    });
+    // 作成日降順でソート
+    filtered.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    return filtered;
+  }, [searchTerm, feedbacks]);
 
   const totalPages = Math.ceil(filteredAndSortedFeedbacks.length / itemsPerPage)
   const paginatedFeedbacks = filteredAndSortedFeedbacks.slice(
@@ -375,78 +326,37 @@ export default function CompanyFeedbackPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>学生名</TableHead>
-                  <TableHead>職種・求人名</TableHead>
-                  <TableHead>評価</TableHead>
-                  <TableHead>送信状況</TableHead>
+                  <TableHead>総合評価</TableHead>
+                  <TableHead>総評</TableHead>
                   <TableHead>作成日</TableHead>
                   <TableHead>更新日</TableHead>
-                  <TableHead>担当者</TableHead>
                   <TableHead>操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {paginatedFeedbacks.map((feedback) => (
                   <TableRow key={feedback.id} className="hover:bg-gray-50">
-                    <TableCell className="font-medium">
-                      <div className="flex items-center gap-2">
-                        <User className="w-4 h-4 text-gray-400" />
-                        {feedback.studentName}
+                    <TableCell>{feedback.studentName}</TableCell>
+                    <TableCell>
+                      <div className="flex items-center space-x-1">
+                        {[...Array(5)].map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-4 h-4 ${i < feedback.overallRating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`}
+                          />
+                        ))}
+                        <span className="ml-2 text-sm text-gray-600"></span>
                       </div>
                     </TableCell>
+                    <TableCell className="max-w-xs truncate">{feedback.overallComment}</TableCell>
+                    <TableCell>{format(feedback.createdAt, 'yyyy/MM/dd', { locale: ja })}</TableCell>
+                    <TableCell>{format(feedback.updatedAt, 'yyyy/MM/dd', { locale: ja })}</TableCell>
                     <TableCell>
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <Briefcase className="w-4 h-4 text-gray-400" />
-                          <span className="font-medium">{feedback.jobTitle}</span>
-                        </div>
-                        <div className="text-sm text-gray-600">{feedback.jobName}</div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        {renderStars(feedback.rating)}
-                        <span className="ml-2 text-sm text-gray-600">{feedback.rating}/5</span>
-                      </div>
-                    </TableCell>
-                    <TableCell>{getStatusBadge(feedback.status)}</TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="w-4 h-4 text-gray-400" />
-                        {format(feedback.createdAt, "yyyy/MM/dd", { locale: ja })}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <CalendarIcon className="w-4 h-4 text-gray-400" />
-                        {format(feedback.updatedAt, "yyyy/MM/dd", { locale: ja })}
-                      </div>
-                    </TableCell>
-                    <TableCell>{feedback.assignee}</TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            (window.location.href = companyId
-                              ? `/company/${companyId}/feedback/${feedback.id}/edit`
-                              : `/company/feedback/${feedback.id}/edit`)
-                          }
-                        >
-                          編集
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            (window.location.href = companyId
-                              ? `/company/${companyId}/feedback/${feedback.id}`
-                              : `/company/feedback/${feedback.id}`)
-                          }
-                        >
+                      <Link href={`/company/${companyId}/feedback/${feedback.id}`}>
+                        <Button variant="outline" size="sm">
                           詳細
                         </Button>
-                      </div>
+                      </Link>
                     </TableCell>
                   </TableRow>
                 ))}

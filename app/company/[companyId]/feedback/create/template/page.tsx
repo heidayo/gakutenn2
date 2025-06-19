@@ -8,6 +8,10 @@ import { Badge } from "@/components/ui/badge"
 import { Separator } from "@/components/ui/separator"
 import { Star, Send, ArrowLeft, User, Clock, CheckCircle } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { supabase } from "@/lib/supabase/client"
+import { useParams } from 'next/navigation'
+import { useEffect } from 'react'
+import Image from "next/image"
 
 // 評価テンプレート
 const feedbackTemplates = [
@@ -54,14 +58,6 @@ const feedbackTemplates = [
   },
 ]
 
-// 学生データ（サンプル）
-const students = [
-  { id: "1", name: "田中太郎", university: "東京大学", major: "情報工学" },
-  { id: "2", name: "佐藤花子", university: "早稲田大学", major: "経済学" },
-  { id: "3", name: "高橋次郎", university: "慶應義塾大学", major: "商学" },
-  { id: "4", name: "伊藤美咲", university: "上智大学", major: "外国語学" },
-]
-
 interface FeedbackData {
   templateId: string
   studentId: string
@@ -86,8 +82,85 @@ export default function CreateFeedbackTemplatePage() {
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
 
+  // 求人一覧を格納するstate
+  const [jobsList, setJobsList] = useState<{ id: string; title: string }[]>([])
+  // 選択された求人IDを格納するstate
+  const [selectedJobId, setSelectedJobId] = useState<string>("")
+
+  // SupabaseクライアントとルートからcompanyIdを取得
+  const { companyId } = useParams()
+  // companyId を string に正規化
+  const normalizedCompanyId = Array.isArray(companyId) ? companyId[0] : companyId
+
+  // 応募者データを格納するstate
+  const [students, setStudents] = useState<Array<{
+    user_id: string
+    avatar_url: string | null
+    first_name: string | null
+    last_name: string | null
+    full_name: string | null
+    university: string | null
+    faculty: string | null
+  }>>([])
+
+  useEffect(() => {
+    if (!normalizedCompanyId || !selectedJobId) {
+      setStudents([]);
+      return;
+    }
+    const fetchStudents = async () => {
+      const { data: applicationRows, error: appError } = await supabase
+        .from('applications')
+        .select('user_id')
+        .eq('company_id', normalizedCompanyId)
+        .eq('job_id', selectedJobId);
+      if (appError) {
+        console.error('応募者ID取得エラー:', appError);
+        return;
+      }
+      const userIds = applicationRows.map((row) => row.user_id);
+      if (userIds.length === 0) {
+        setStudents([]);
+        return;
+      }
+      const { data: profileRows, error: profileError } = await supabase
+        .from('profiles')
+        .select('user_id, avatar_url, first_name, last_name, full_name, university, faculty')
+        .in('user_id', userIds);
+      if (profileError) {
+        console.error('プロフィール取得エラー:', profileError);
+        return;
+      }
+      setStudents(profileRows);
+    };
+    fetchStudents();
+  }, [normalizedCompanyId, selectedJobId]);
+
+  // 求人が変更されたときに学生選択をリセット
+  useEffect(() => {
+    setSelectedStudent('');
+    setFeedbackData((prev) => ({ ...prev, studentId: '' }));
+  }, [selectedJobId]);
+
+  // 会社に紐づく求人一覧を取得
+  useEffect(() => {
+    if (!normalizedCompanyId) return
+    const fetchJobs = async () => {
+      const { data, error } = await supabase
+        .from("jobs")
+        .select("id, title")
+        .eq("company_id", normalizedCompanyId)
+      if (error) {
+        console.error("求人取得エラー:", error)
+      } else {
+        setJobsList(data || [])
+      }
+    }
+    fetchJobs()
+  }, [normalizedCompanyId])
+
   const currentTemplate = feedbackTemplates.find((t) => t.id === selectedTemplate)
-  const currentStudent = students.find((s) => s.id === selectedStudent)
+  const currentStudent = students.find((s) => s.user_id === selectedStudent)
 
   const handleTemplateSelect = (templateId: string) => {
     setSelectedTemplate(templateId)
@@ -118,19 +191,38 @@ export default function CreateFeedbackTemplatePage() {
   }
 
   const handleSubmit = async () => {
-    setIsSubmitting(true)
-
-    // フィードバック送信処理（実際のAPIコール）
+    if (!normalizedCompanyId) {
+      alert("企業IDが取得できません。");
+      return;
+    }
+    if (!feedbackData.studentId) {
+      alert("評価対象の学生が選択されていません。");
+      return;
+    }
+    setIsSubmitting(true);
     try {
-      await new Promise((resolve) => setTimeout(resolve, 2000)) // 送信シミュレーション
+      const { data, error } = await supabase
+        .from('feedbacks')
+        .insert({
+          company_id: normalizedCompanyId,
+          student_id: feedbackData.studentId,
+          job_id: selectedJobId,
+          template_id: feedbackData.templateId,
+          ratings: feedbackData.ratings,
+          comments: feedbackData.comments,
+          overall_comment: feedbackData.overallComment,
+          overall_rating: feedbackData.overallRating,
+        });
 
-      // 成功時の処理
-      alert("フィードバックを送信しました！")
-      router.push("/company/feedback")
-    } catch (error) {
-      alert("送信に失敗しました。もう一度お試しください。")
+      if (error) {
+        console.error('フィードバック保存エラー:', error);
+        alert('送信に失敗しました。もう一度お試しください。');
+      } else {
+        alert('フィードバックを送信しました！');
+        router.push(`/company/${normalizedCompanyId}/feedback`);
+      }
     } finally {
-      setIsSubmitting(false)
+      setIsSubmitting(false);
     }
   }
 
@@ -146,8 +238,8 @@ export default function CreateFeedbackTemplatePage() {
     ))
   }
 
-  const canProceedToStep2 = selectedTemplate !== ""
-  const canProceedToStep3 = selectedStudent !== ""
+  const canProceedToStep2 = selectedTemplate !== "" && selectedJobId !== ""
+  const canProceedToStep3 = selectedStudent !== "" && students.length > 0;
   const canSubmit =
     currentTemplate &&
     feedbackData.overallRating > 0 &&
@@ -190,6 +282,20 @@ export default function CreateFeedbackTemplatePage() {
             <CardTitle>評価テンプレートを選択</CardTitle>
           </CardHeader>
           <CardContent>
+            {/* 求人選択ドロップダウン */}
+            <div className="mb-4">
+              <label className="text-sm font-medium text-gray-700">対象求人</label>
+              <select
+                className="w-full mt-1 p-2 border rounded"
+                value={selectedJobId}
+                onChange={(e) => setSelectedJobId(e.target.value)}
+              >
+                <option value="">-- 求人を選択 --</option>
+                {jobsList.map((job) => (
+                  <option key={job.id} value={job.id}>{job.title}</option>
+                ))}
+              </select>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {feedbackTemplates.map((template) => (
                 <Card
@@ -228,7 +334,11 @@ export default function CreateFeedbackTemplatePage() {
             </div>
 
             <div className="flex justify-end mt-6">
-              <Button onClick={() => setStep(2)} disabled={!canProceedToStep2} className="px-8">
+              <Button
+                onClick={() => canProceedToStep2 && setStep(2)}
+                disabled={!canProceedToStep2}
+                className="px-8"
+              >
                 次へ
               </Button>
             </div>
@@ -247,26 +357,36 @@ export default function CreateFeedbackTemplatePage() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {students.map((student) => (
                   <Card
-                    key={student.id}
+                    key={student.user_id}
                     className={`cursor-pointer transition-all hover:shadow-md ${
-                      selectedStudent === student.id ? "ring-2 ring-blue-600 bg-blue-50" : "hover:bg-gray-50"
+                      selectedStudent === student.user_id ? "ring-2 ring-blue-600 bg-blue-50" : "hover:bg-gray-50"
                     }`}
-                    onClick={() => handleStudentSelect(student.id)}
+                    onClick={() => handleStudentSelect(student.user_id)}
                   >
                     <CardContent className="p-4">
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center space-x-3">
-                          <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                            <User className="w-5 h-5 text-gray-600" />
-                          </div>
+                          {student.avatar_url ? (
+                            <Image
+                              src={student.avatar_url}
+                              alt={student.full_name || "アバター"}
+                              width={40}
+                              height={40}
+                              className="rounded-full"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
+                              <User className="w-5 h-5 text-gray-600" />
+                            </div>
+                          )}
                           <div>
-                            <h3 className="font-semibold">{student.name}</h3>
+                            <h3 className="font-semibold">{student.full_name || `${student.first_name} ${student.last_name}`}</h3>
                             <p className="text-sm text-gray-600">{student.university}</p>
                           </div>
                         </div>
-                        {selectedStudent === student.id && <CheckCircle className="w-5 h-5 text-blue-600" />}
+                        {selectedStudent === student.user_id && <CheckCircle className="w-5 h-5 text-blue-600" />}
                       </div>
-                      <p className="text-sm text-gray-500">{student.major}</p>
+                      <p className="text-sm text-gray-500">{student.faculty}</p>
                     </CardContent>
                   </Card>
                 ))}
@@ -297,7 +417,7 @@ export default function CreateFeedbackTemplatePage() {
                   <Separator orientation="vertical" className="h-6" />
                   <div className="flex items-center space-x-2">
                     <User className="w-4 h-4 text-gray-600" />
-                    <span className="font-medium">{currentStudent.name}</span>
+                    <span className="font-medium">{currentStudent.full_name || `${currentStudent.first_name} ${currentStudent.last_name}`}</span>
                     <span className="text-sm text-gray-600">({currentStudent.university})</span>
                   </div>
                 </div>

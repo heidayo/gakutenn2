@@ -12,12 +12,16 @@ import {
   GraduationCap,
   MapPin,
   Building2,
+  Clock,
+  CheckCircle,
+  XCircle,
 } from "lucide-react"
 import Link from "next/link"
 import { useParams } from "next/navigation"
 
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client"
+import { Badge } from "@/components/ui/badge"
 
 interface ApplicationRow {
   id: string;
@@ -32,7 +36,38 @@ interface ApplicationRow {
   name: string;
   university: string;
   location: string;
+  status: string;
 }
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case "書類選考中":
+      return <Clock className="h-4 w-4" />;
+    case "面談予定":
+      return <Calendar className="h-4 w-4" />;
+    case "採用":
+      return <CheckCircle className="h-4 w-4" />;
+    case "不採用":
+      return <XCircle className="h-4 w-4" />;
+    default:
+      return <Clock className="h-4 w-4" />;
+  }
+};
+
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case "書類選考中":
+      return "bg-yellow-100 text-yellow-800";
+    case "面談予定":
+      return "bg-blue-100 text-blue-800";
+    case "採用":
+      return "bg-green-100 text-green-800";
+    case "不採用":
+      return "bg-red-100 text-red-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+};
 
 export default function ApplicationsPage() {
   const [stats, setStats] = useState({
@@ -85,6 +120,7 @@ export default function ApplicationsPage() {
       setApplications(
         (rows ?? []).map((r: any) => ({
           id: r.id,
+          status: r.status,
           jobId: r.job_id,
           userId: r.user_id,
           availableDays: r.available_days ?? [],
@@ -203,6 +239,12 @@ export default function ApplicationsPage() {
                         <span className="text-white font-bold">{applicant.name.charAt(0)}</span>
                       </div>
                       <div className="flex-1">
+                        <div className="flex items-center space-x-2 mb-2">
+                          <Badge className={`${getStatusColor(applicant.status)} rounded-full px-3 py-1 flex items-center space-x-1 text-sm`}>
+                            {getStatusIcon(applicant.status)}
+                            <span className="text-sm">{applicant.status}</span>
+                          </Badge>
+                        </div>
                         <div className="mb-1">
                           <h3 className="font-semibold">{applicant.name}</h3>
                         </div>
