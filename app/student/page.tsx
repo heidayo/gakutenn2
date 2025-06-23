@@ -178,7 +178,7 @@ export default function StudentHomePage() {
   const [isLoading, setIsLoading] = useState(false)
   const [hasMore, setHasMore] = useState(true)
   const [page, setPage] = useState(1)
-  const [favorites, setFavorites] = useState<number[]>([])
+  const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set())
   
   // おすすめ求人データ
   const [recommendedJobs, setRecommendedJobs] = useState<any[]>([])
@@ -209,15 +209,8 @@ export default function StudentHomePage() {
   const [interviewsCount, setInterviewsCount] = useState<number | null>(null)
   const [averageRating, setAverageRating] = useState<number | null>(null)
 
-  // お気に入り状態をローカルストレージから読み込む
-  useEffect(() => {
-    const savedFavorites = localStorage.getItem("favoriteJobs")
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites))
-    }
-  }, [])
-
   // Supabase から応募数・面談数・平均評価を取得
+
   useEffect(() => {
     const fetchStats = async () => {
       const {
@@ -263,20 +256,56 @@ export default function StudentHomePage() {
     fetchStats()
   }, [])
 
-  // お気に入り状態をローカルストレージに保存
+  // Load bookmarks from Supabase
   useEffect(() => {
-    localStorage.setItem("favoriteJobs", JSON.stringify(favorites))
-  }, [favorites])
-
-  const toggleFavorite = (jobId: number) => {
-    setFavorites((prev) => {
-      if (prev.includes(jobId)) {
-        return prev.filter((id) => id !== jobId)
-      } else {
-        return [...prev, jobId]
+    const fetchSavedJobs = async () => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        console.error("Error getting user:", userError)
+        return
       }
-    })
-  }
+      const { data: bookmarks, error: bmError } = await supabase
+        .from("bookmarks")
+        .select("job_id")
+        .eq("student_id", user.id)
+      if (bmError) {
+        console.error("Error fetching saved jobs:", bmError)
+      } else {
+        setSavedJobs(new Set(bookmarks.map((b) => b.job_id)))
+      }
+    }
+    fetchSavedJobs()
+  }, [])
+
+  const toggleFavorite = useCallback(async (jobId: string) => {
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      console.error("Error getting user:", userError)
+      return
+    }
+    if (!savedJobs.has(jobId)) {
+      const { error: insertError } = await supabase
+        .from("bookmarks")
+        .insert({ student_id: user.id, job_id: jobId })
+      if (insertError) {
+        console.error("Error inserting bookmark:", insertError)
+      } else {
+        setSavedJobs(new Set(savedJobs).add(jobId))
+      }
+    } else {
+      const { error: deleteError } = await supabase
+        .from("bookmarks")
+        .delete()
+        .match({ student_id: user.id, job_id: jobId })
+      if (deleteError) {
+        console.error("Error deleting bookmark:", deleteError)
+      } else {
+        const newSet = new Set(savedJobs)
+        newSet.delete(jobId)
+        setSavedJobs(newSet)
+      }
+    }
+  }, [savedJobs])
 
   const loadMoreJobs = useCallback(async () => {
     if (isLoading || !hasMore) return
@@ -446,7 +475,7 @@ export default function StudentHomePage() {
       {/* Job Feed */}
       <div className="px-4 space-y-4">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold">おすすめの案件</h2>
+          <h2 className="text-lg font-semibold">おすすめの求人</h2>
           <Link href="/student/search">
             <Button variant="ghost" size="sm" className="text-orange-600">
               すべて見る
@@ -467,14 +496,14 @@ export default function StudentHomePage() {
                       onClick={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
-                        toggleFavorite(job.id)
+                        toggleFavorite(job.id.toString())
                       }}
                       className="transition-transform hover:scale-110 active:scale-95"
-                      aria-label={favorites.includes(job.id) ? "お気に入りから削除" : "お気に入りに追加"}
+                      aria-label={savedJobs.has(job.id?.toString?.()) ? "お気に入りから削除" : "お気に入りに追加"}
                     >
                       <Bookmark
                         className={`h-5 w-5 drop-shadow-md ${
-                          favorites.includes(job.id) ? "text-orange-500 fill-orange-500" : "text-white"
+                          savedJobs.has(job.id?.toString?.()) ? "text-orange-500 fill-orange-500" : "text-white"
                         }`}
                       />
                     </button>
