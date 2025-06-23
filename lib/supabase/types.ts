@@ -17,6 +17,7 @@ export type Database = {
           company_id: string | null
           created_at: string
           id: string
+          is_read: boolean
           job_id: string
           name: string | null
           next_date: string | null
@@ -33,6 +34,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           id?: string
+          is_read?: boolean
           job_id: string
           name?: string | null
           next_date?: string | null
@@ -49,6 +51,7 @@ export type Database = {
           company_id?: string | null
           created_at?: string
           id?: string
+          is_read?: boolean
           job_id?: string
           name?: string | null
           next_date?: string | null
@@ -169,6 +172,7 @@ export type Database = {
           company_id: string
           created_at: string
           id: string
+          is_read: boolean
           job_id: string | null
           overall_comment: string
           overall_rating: number
@@ -182,6 +186,7 @@ export type Database = {
           company_id: string
           created_at?: string
           id?: string
+          is_read?: boolean
           job_id?: string | null
           overall_comment: string
           overall_rating: number
@@ -195,6 +200,7 @@ export type Database = {
           company_id?: string
           created_at?: string
           id?: string
+          is_read?: boolean
           job_id?: string | null
           overall_comment?: string
           overall_rating?: number
@@ -237,6 +243,7 @@ export type Database = {
           evaluation: string | null
           id: number
           interviewer: string | null
+          is_read: boolean
           job_id: string
           location: string | null
           meeting_link: string | null
@@ -256,6 +263,7 @@ export type Database = {
           evaluation?: string | null
           id?: number
           interviewer?: string | null
+          is_read?: boolean
           job_id: string
           location?: string | null
           meeting_link?: string | null
@@ -275,6 +283,7 @@ export type Database = {
           evaluation?: string | null
           id?: number
           interviewer?: string | null
+          is_read?: boolean
           job_id?: string
           location?: string | null
           meeting_link?: string | null
