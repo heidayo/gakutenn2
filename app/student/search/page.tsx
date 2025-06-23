@@ -58,6 +58,27 @@ export default function SearchPage() {
   const [sortBy, setSortBy] = useState("newest")
   const [displayedJobs, setDisplayedJobs] = useState(20)
   const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set())
+  // Load bookmarks from Supabase
+  useEffect(() => {
+    const fetchSavedJobs = async () => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError) {
+        console.error("Error getting user:", userError)
+        return
+      }
+      if (!user) return
+      const { data: bookmarks, error: bmError } = await supabase
+        .from("bookmarks")
+        .select("job_id")
+        .eq("student_id", user.id)
+      if (bmError) {
+        console.error("Error fetching saved jobs:", bmError)
+      } else {
+        setSavedJobs(new Set(bookmarks.map((b) => b.job_id)))
+      }
+    }
+    fetchSavedJobs()
+  }, [])
   // 時給レンジ
   const [hourlyRange, setHourlyRange] = useState<[number, number]>([1000, 3000])
 
@@ -135,17 +156,38 @@ export default function SearchPage() {
   }, [])
 
   // 求人保存処理
-  const toggleSaveJob = useCallback((jobId: string) => {
-    setSavedJobs((prev) => {
-      const newSet = new Set(prev)
-      if (newSet.has(jobId)) {
-        newSet.delete(jobId)
+  const toggleSaveJob = useCallback(async (jobId: string) => {
+    const getUserResponse = await supabase.auth.getUser()
+    const user = getUserResponse.data.user
+    if (getUserResponse.error || !user) {
+      console.error("Error getting user or no user:", getUserResponse.error)
+      return
+    }
+    if (!savedJobs.has(jobId)) {
+      // Insert bookmark
+      const { error: insertError } = await supabase
+        .from("bookmarks")
+        .insert({ student_id: user.id, job_id: jobId })
+      if (insertError) {
+        console.error("Error inserting bookmark:", insertError)
       } else {
-        newSet.add(jobId)
+        setSavedJobs(new Set(savedJobs).add(jobId))
       }
-      return newSet
-    })
-  }, [])
+    } else {
+      // Delete bookmark
+      const { error: deleteError } = await supabase
+        .from("bookmarks")
+        .delete()
+        .match({ student_id: user.id, job_id: jobId })
+      if (deleteError) {
+        console.error("Error deleting bookmark:", deleteError)
+      } else {
+        const newSet = new Set(savedJobs)
+        newSet.delete(jobId)
+        setSavedJobs(newSet)
+      }
+    }
+  }, [savedJobs])
 
   // フィルタリング＆ソート処理
   const filteredAndSortedJobs = useMemo(() => {

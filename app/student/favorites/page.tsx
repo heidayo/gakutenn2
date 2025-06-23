@@ -21,98 +21,60 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
+import { supabase } from "@/lib/supabase/client"
 
 export default function FavoritesPage() {
-  const [favorites, setFavorites] = useState<number[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [sortBy, setSortBy] = useState<"newest" | "salary" | "location">("newest")
   const [filterBy, setFilterBy] = useState<"all" | "part-time" | "internship">("all")
 
-  // サンプル求人データ（実際のアプリでは API から取得）
-  const allJobs = [
-    {
-      id: 1,
-      company: "株式会社テックスタート",
-      title: "💻 Webマーケティングアシスタント",
-      location: "東京都渋谷区",
-      duration: "週1回〜",
-      salary: "時給1,200円",
-      time: "17:00〜18:00",
-      image: "/placeholder.svg?height=120&width=200&text=Tech+Office",
-      tags: ["未経験歓迎", "週1OK", "リモート可"],
-      isNew: true,
-      type: "part-time",
-      savedAt: new Date("2024-01-15"),
-    },
-    {
-      id: 2,
-      company: "クリエイティブ合同会社",
-      title: "📱 SNS運用サポート",
-      location: "大阪府大阪市",
-      duration: "単発OK",
-      salary: "日給8,000円",
-      time: "15:00〜16:00",
-      image: "/placeholder.svg?height=120&width=200&text=Creative+Space",
-      tags: ["単発OK", "土日可", "交通費支給"],
-      isNew: false,
-      type: "internship",
-      savedAt: new Date("2024-01-10"),
-    },
-    {
-      id: 3,
-      company: "イノベーション株式会社",
-      title: "📊 データ入力・分析補助",
-      location: "リモート",
-      duration: "週2回〜",
-      salary: "時給1,000円",
-      time: "10:00〜14:00",
-      image: "/placeholder.svg?height=120&width=200&text=Data+Center",
-      tags: ["リモート", "未経験歓迎", "平日のみ"],
-      isNew: true,
-      type: "part-time",
-      savedAt: new Date("2024-01-12"),
-    },
-    {
-      id: 4,
-      company: "カフェ・ド・パリ",
-      title: "☕ カフェスタッフ",
-      location: "東京都新宿区",
-      duration: "週3回〜",
-      salary: "時給1,100円",
-      time: "18:00〜22:00",
-      image: "/placeholder.svg?height=120&width=200&text=Cafe+Interior",
-      tags: ["未経験歓迎", "学生歓迎", "まかない付"],
-      isNew: false,
-      type: "part-time",
-      savedAt: new Date("2024-01-08"),
-    },
-  ]
+  // Supabase から取得したブックマーク済み求人
+  const [jobs, setJobs] = useState<any[]>([])
 
-  // お気に入り状態をローカルストレージから読み込む
   useEffect(() => {
-    const savedFavorites = localStorage.getItem("favoriteJobs")
-    if (savedFavorites) {
-      setFavorites(JSON.parse(savedFavorites))
+    const fetchBookmarks = async () => {
+      const { data: { user }, error: userError } = await supabase.auth.getUser()
+      if (userError || !user) {
+        console.error("Error getting user:", userError)
+        return
+      }
+      const { data: bookmarks, error: bmError } = await supabase
+        .from("bookmarks")
+        .select("job:jobs(*, company:companies(name)), created_at")
+        .eq("student_id", user.id)
+      if (bmError) {
+        console.error("Error fetching bookmarks:", bmError)
+      } else {
+        setJobs(
+          bookmarks.map((b) => ({
+            ...b.job,
+            company: b.job.company.name,
+            savedAt: b.created_at
+          }))
+        )
+      }
     }
+    fetchBookmarks()
   }, [])
 
-  // お気に入り状態をローカルストレージに保存
-  useEffect(() => {
-    localStorage.setItem("favoriteJobs", JSON.stringify(favorites))
-  }, [favorites])
-
-  const toggleFavorite = (jobId: number) => {
-    setFavorites((prev) => {
-      if (prev.includes(jobId)) {
-        return prev.filter((id) => id !== jobId)
-      } else {
-        return [...prev, jobId]
-      }
-    })
+  const toggleFavorite = async (jobId: string) => {
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    if (userError || !user) {
+      console.error("Error getting user:", userError)
+      return
+    }
+    const { error: delError } = await supabase
+      .from("bookmarks")
+      .delete()
+      .match({ student_id: user.id, job_id: jobId })
+    if (delError) {
+      console.error("Error deleting bookmark:", delError)
+    } else {
+      setJobs((prev) => prev.filter((job) => job.id !== jobId))
+    }
   }
 
-  // お気に入りの求人のみフィルタリング
-  const favoriteJobs = allJobs.filter((job) => favorites.includes(job.id))
+  const favoriteJobs = jobs
 
   // 検索とフィルタリング
   const filteredJobs = favoriteJobs
@@ -127,7 +89,7 @@ export default function FavoritesPage() {
     .sort((a, b) => {
       switch (sortBy) {
         case "newest":
-          return b.savedAt.getTime() - a.savedAt.getTime()
+          return new Date(b.savedAt).getTime() - new Date(a.savedAt).getTime()
         case "salary":
           const salaryA = Number.parseInt(a.salary.replace(/[^\d]/g, ""))
           const salaryB = Number.parseInt(b.salary.replace(/[^\d]/g, ""))
@@ -222,76 +184,77 @@ export default function FavoritesPage() {
             </Link>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {filteredJobs.map((job) => (
-              <Card key={job.id} className="overflow-hidden hover:shadow-md transition-shadow">
-                <div className="flex">
-                  <div className="relative w-24 h-20 flex-shrink-0">
-                    <img src={job.image || "/placeholder.svg"} alt={job.title} className="w-full h-full object-cover" />
-                    <div className="absolute top-1 right-1">
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          toggleFavorite(job.id)
-                        }}
-                        className="transition-transform hover:scale-110 active:scale-95"
-                        aria-label="お気に入りから削除"
-                      >
-                        <Bookmark className="h-4 w-4 text-orange-500 fill-orange-500" />
-                      </button>
-                    </div>
-                  </div>
-
-                  <CardContent className="flex-1 p-3">
-                    <div className="flex justify-between items-start mb-2">
-                      <h3 className="font-medium text-sm line-clamp-2 leading-tight flex-1 mr-2">{job.title}</h3>
-                      {job.isNew && <Badge className="bg-red-500 text-white text-xs px-1.5 py-0.5">NEW</Badge>}
-                    </div>
-
-                    <p className="text-xs text-gray-600 mb-2">{job.company}</p>
-
-                    <div className="space-y-1 text-xs text-gray-600 mb-2">
-                      <div className="flex items-center space-x-1">
-                        <Clock className="h-3 w-3" />
-                        <span>{job.time}</span>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        <MapPin className="h-3 w-3" />
-                        <span>{job.location}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-between items-center">
-                      <div className="text-sm font-bold text-green-600">{job.salary}</div>
-                      <div className="text-xs text-gray-400">
-                        {job.savedAt.toLocaleDateString("ja-JP", {
-                          month: "short",
-                          day: "numeric",
-                        })}
-                        保存
-                      </div>
-                    </div>
-
-                    <div className="flex flex-wrap gap-1 mt-2">
-                      {job.tags.slice(0, 2).map((tag, index) => (
-                        <Badge
-                          key={index}
-                          variant="secondary"
-                          className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600"
+              <Link href={`/student/jobs/${job.id}`} key={job.id}>
+                <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
+                  <div className="flex">
+                    <div className="relative w-24 h-20 flex-shrink-0">
+                      <img src={job.image || "/placeholder.svg"} alt={job.title} className="w-full h-full object-cover" />
+                      <div className="absolute top-1 right-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            toggleFavorite(job.id)
+                          }}
+                          className="transition-transform hover:scale-110 active:scale-95"
+                          aria-label="お気に入りから削除"
                         >
-                          {tag}
-                        </Badge>
-                      ))}
-                      {job.tags.length > 2 && (
-                        <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600">
-                          +{job.tags.length - 2}
-                        </Badge>
-                      )}
+                          <Bookmark className="h-4 w-4 text-orange-500 fill-orange-500" />
+                        </button>
+                      </div>
                     </div>
-                  </CardContent>
-                </div>
-              </Card>
+
+                    <CardContent className="flex-1 p-3">
+                      <div className="flex justify-between items-start mb-2">
+                        <h3 className="font-medium text-sm line-clamp-2 leading-tight flex-1 mr-2">{job.title}</h3>
+                        {job.isNew && <Badge className="bg-red-500 text-white text-xs px-1.5 py-0.5">NEW</Badge>}
+                      </div>
+
+                      <p className="text-xs text-gray-600 mb-2">{job.company}</p>
+
+                      <div className="space-y-1 text-xs text-gray-600 mb-2">
+                        <div className="flex items-center space-x-1">
+                          <Clock className="h-3 w-3" />
+                          <span>{job.time}</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <MapPin className="h-3 w-3" />
+                          <span>{job.location}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex justify-between items-center">
+                        <div className="text-sm font-bold text-green-600">¥{job.salary}</div>
+                        <div className="text-xs text-gray-400">
+                          {new Date(job.savedAt).toLocaleDateString("ja-JP", {
+                            month: "short",
+                            day: "numeric",
+                          })}
+                          保存
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap gap-1 mt-2">
+                        {job.tags.slice(0, 2).map((tag: string, index: number) => (
+                          <Badge
+                            key={index}
+                            variant="secondary"
+                            className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600"
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
+                        {job.tags.length > 2 && (
+                          <Badge variant="secondary" className="text-xs px-1.5 py-0.5 bg-gray-100 text-gray-600">
+                            +{job.tags.length - 2}
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </div>
+                </Card>
+              </Link>
             ))}
           </div>
         )}

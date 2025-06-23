@@ -48,22 +48,48 @@ export default function JobDetailPage() {
   const [job, setJob] = useState<JobDetail | null>(null)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    const fetchJob = async () => {
-      const { data, error } = await supabase
-        .from("jobs")
-        .select("*, company:companies(name)")
-        .eq("id", id as string)
-        .single<JobDetail>()
-      if (error) {
-        console.error("Error fetching job:", error)
-      } else {
-        setJob(data)
-      }
-      setLoading(false)
+useEffect(() => {
+  const fetchData = async () => {
+    // Get current authenticated user
+    const {
+      data: { user },
+      error: userError
+    } = await supabase.auth.getUser()
+    if (userError) {
+      console.error("Error getting user:", userError)
     }
-    fetchJob()
-  }, [id])
+
+    // Fetch job detail
+    const { data: jobData, error: jobError } = await supabase
+      .from("jobs")
+      .select("*, company:companies(name)")
+      .eq("id", id as string)
+      .single<JobDetail>()
+    if (jobError) {
+      console.error("Error fetching job:", jobError)
+    } else {
+      setJob(jobData)
+    }
+
+    // Fetch bookmark status
+    if (user) {
+      const { data: bookmarkData, error: bookmarkError } = await supabase
+        .from("bookmarks")
+        .select("id")
+        .eq("student_id", user.id)
+        .eq("job_id", id as string)
+        .single()
+      // Ignore "row not found" error
+      if (bookmarkError && bookmarkError.code !== "PGRST116") {
+        console.error("Error fetching bookmark:", bookmarkError)
+      }
+      setIsBookmarked(!!bookmarkData)
+    }
+
+    setLoading(false)
+  }
+  fetchData()
+}, [id])
 
   if (loading) {
     return <div>Loading...</div>
@@ -72,9 +98,35 @@ export default function JobDetailPage() {
     return <div>求人が見つかりませんでした</div>
   }
 
-  const handleBookmark = () => {
-    setIsBookmarked(!isBookmarked)
+const handleBookmark = async () => {
+  // Get authenticated user
+  const getUserResponse = await supabase.auth.getUser()
+  const user = getUserResponse.data.user
+  if (getUserResponse.error || !user) {
+    console.error("Error getting user or no user:", getUserResponse.error)
+    return
   }
+  if (!isBookmarked) {
+    const { error: insertError } = await supabase
+      .from("bookmarks")
+      .insert({ student_id: user.id, job_id: id as string })
+    if (insertError) {
+      console.error("Error inserting bookmark:", insertError)
+    } else {
+      setIsBookmarked(true)
+    }
+  } else {
+    const { error: deleteError } = await supabase
+      .from("bookmarks")
+      .delete()
+      .match({ student_id: user.id, job_id: id as string })
+    if (deleteError) {
+      console.error("Error deleting bookmark:", deleteError)
+    } else {
+      setIsBookmarked(false)
+    }
+  }
+}
 
 
   return (
@@ -90,7 +142,7 @@ export default function JobDetailPage() {
           </div>
           <div className="flex items-center space-x-2">
             <Button variant="ghost" size="sm" onClick={handleBookmark}>
-              <Bookmark className={`h-5 w-5 ${isBookmarked ? "fill-current text-blue-600" : "text-gray-600"}`} />
+              <Bookmark className={`h-5 w-5 ${isBookmarked ? "fill-current text-orange-500" : "text-gray-600"}`} />
             </Button>
             <Button variant="ghost" size="sm">
               <Share className="h-5 w-5 text-gray-600" />
