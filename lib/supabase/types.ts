@@ -76,6 +76,13 @@ export type Database = {
             referencedRelation: "jobs"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "fk_applications_user_id__students_id"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
         ]
       }
       bookmarks: {
@@ -106,11 +113,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "bookmarks_student_id_fkey"
+            foreignKeyName: "fk_bookmarks_student_id__students_id"
             columns: ["student_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
+            referencedRelation: "students"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -261,11 +268,11 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "feedbacks_student_id_fkey"
+            foreignKeyName: "fk_feedbacks_student_id__students_id"
             columns: ["student_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
+            referencedRelation: "students"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -332,11 +339,18 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "interviews_applicant_id_fkey"
+            foreignKeyName: "fk_interviews_applicant_id__students_id"
             columns: ["applicant_id"]
             isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["user_id"]
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_interviews_jobid_companyid__jobs"
+            columns: ["job_id", "company_id"]
+            isOneToOne: false
+            referencedRelation: "jobs"
+            referencedColumns: ["id", "company_id"]
           },
           {
             foreignKeyName: "interviews_company_id_fkey"
@@ -461,6 +475,7 @@ export type Database = {
       messages: {
         Row: {
           application_id: string
+          company_id: string | null
           content: string
           created_at: string
           id: string
@@ -470,6 +485,7 @@ export type Database = {
         }
         Insert: {
           application_id: string
+          company_id?: string | null
           content: string
           created_at?: string
           id?: string
@@ -479,6 +495,7 @@ export type Database = {
         }
         Update: {
           application_id?: string
+          company_id?: string | null
           content?: string
           created_at?: string
           id?: string
@@ -507,6 +524,61 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "company_chat_rooms_view"
             referencedColumns: ["chat_room_id"]
+          },
+          {
+            foreignKeyName: "messages_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          company_id: string | null
+          created_at: string
+          id: string
+          is_read: boolean
+          payload: Json | null
+          resource: string
+          resource_id: string
+          student_id: string | null
+        }
+        Insert: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          payload?: Json | null
+          resource: string
+          resource_id: string
+          student_id?: string | null
+        }
+        Update: {
+          company_id?: string | null
+          created_at?: string
+          id?: string
+          is_read?: boolean
+          payload?: Json | null
+          resource?: string
+          resource_id?: string
+          student_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_company_id_fkey"
+            columns: ["company_id"]
+            isOneToOne: false
+            referencedRelation: "companies"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_student_id_fkey"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -556,7 +628,15 @@ export type Database = {
           user_id?: string
           year?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_profiles_user_id__students_id"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       students: {
         Row: {
@@ -647,7 +727,15 @@ export type Database = {
           student_id: string | null
           unread_count: number | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_applications_user_id__students_id"
+            columns: ["student_id"]
+            isOneToOne: false
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Functions: {

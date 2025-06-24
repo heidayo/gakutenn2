@@ -70,8 +70,7 @@ export default function CompanyInterviewsPage() {
 
   // 面談一覧取得
   const fetchInterviews = async () => {
-    const sb = supabase as any;
-    const { data, error } = await sb
+    const { data: interviewsData, error: interviewsError } = await supabase
       .from("interviews")
       .select(`
         id,
@@ -87,35 +86,48 @@ export default function CompanyInterviewsPage() {
         evaluation,
         priority,
         applicant_id,
-        profiles!inner(user_id, full_name),
-        jobs(title)
+        job_id,
+        jobs!interviews_job_id_fkey(title)
       `)
       .eq("company_id", companyId)
       .order("date");
-    if (error) {
-      console.error("interviews fetch error", error);
+    if (interviewsError) {
+      console.error("interviews fetch error", interviewsError);
       return;
     }
+
+    const applicantIds = (interviewsData ?? []).map((row: any) => row.applicant_id);
+    const { data: profilesData, error: profilesError } = await supabase
+      .from("profiles")
+      .select("user_id, full_name")
+      .in("user_id", applicantIds);
+    if (profilesError) {
+      console.error("profiles fetch error", profilesError);
+    }
+
     setInterviews(
-      (data ?? []).map((row: any) => ({
-        id: row.id,
-        applicant: row.profiles.full_name,
-        applicantId: row.applicant_id,
-        job: row.jobs.title,
-        date: new Date(row.date).toLocaleDateString("ja-JP"),
-        time:
-          row.start_time && row.end_time
-            ? `${row.start_time}-${row.end_time}`
-            : "",
-        type: row.type,
-        status: row.status,
-        interviewer: row.interviewer ?? "-",
-        meetingLink: row.meeting_link ?? undefined,
-        location: row.location ?? undefined,
-        notes: row.notes ?? undefined,
-        evaluation: row.evaluation ?? undefined,
-        priority: row.priority ?? "中",
-      }))
+      (interviewsData ?? []).map((row: any) => {
+        const profile = profilesData?.find((p: any) => p.user_id === row.applicant_id);
+        return {
+          id: row.id,
+          applicant: profile?.full_name ?? "未設定",
+          applicantId: row.applicant_id,
+          job: row.jobs?.title ?? "",
+          date: new Date(row.date).toLocaleDateString("ja-JP"),
+          time:
+            row.start_time && row.end_time
+              ? `${row.start_time}-${row.end_time}`
+              : "",
+          type: row.type,
+          status: row.status,
+          interviewer: row.interviewer ?? "-",
+          meetingLink: row.meeting_link ?? undefined,
+          location: row.location ?? undefined,
+          notes: row.notes ?? undefined,
+          evaluation: row.evaluation ?? undefined,
+          priority: row.priority ?? "中",
+        };
+      })
     );
   };
 

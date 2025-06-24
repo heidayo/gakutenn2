@@ -54,6 +54,7 @@ export default function ChatPage() {
   const [chatRooms, setChatRooms] = useState<CompanyChatRoom[]>([])
   const [loading, setLoading] = useState<boolean>(true)
   const [applicationId, setApplicationId] = useState<string | null>(null)
+  const [companyId, setCompanyId] = useState<string | null>(null)
 
   useEffect(() => {
     if (!roomId) return
@@ -72,6 +73,7 @@ export default function ChatPage() {
             jobs!applications_job_id_fkey (
               title,
               companies!jobs_company_id_fkey (
+                id,
                 name
               )
             )
@@ -84,6 +86,7 @@ export default function ChatPage() {
         console.error('chat rooms fetch error:', error)
       } else {
         setApplicationId(room.application_id)
+        setCompanyId(room.applications?.jobs?.companies?.id ?? null)
         const mapped = [{
           chat_room_id: room.id.toString(),
           application_id: room.application_id,
@@ -189,11 +192,12 @@ export default function ChatPage() {
   const timeSlots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"]
 
   const handleSendMessage = async () => {
-    if (!message.trim() || !applicationId) return
+    if (!message.trim() || !applicationId || !companyId) return
     const { data: inserted, error } = await supabase
       .from('messages')
       .insert({
         application_id: applicationId,
+        company_id: companyId,
         content: message.trim(),
         sender: 'student',
         type: 'text',

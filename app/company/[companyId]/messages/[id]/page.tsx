@@ -29,12 +29,28 @@ import {
 import Link from "next/link"
 import { useState } from "react"
 
-export default function CompanyChatPage({ params }: { params: { id: string } }) {
+import { supabase } from "@/lib/supabase/client";
+
+
+type DisplayMessage = {
+  id: string;
+  sender: 'company' | 'student';
+  content: string;
+  timestamp: string;
+  isRead: boolean;
+  type: 'text' | 'file';
+  fileName?: string;
+  fileSize?: string;
+}
+
+export default function CompanyChatPage({ params }: { params: { companyId: string; id: string } }) {
   const [message, setMessage] = useState("")
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
   const [selectedTime, setSelectedTime] = useState("")
   const [showScheduleDialog, setShowScheduleDialog] = useState(false)
   const [showAttachmentMenu, setShowAttachmentMenu] = useState(false)
+
+  
 
   const student = {
     id: 1,
@@ -50,9 +66,9 @@ export default function CompanyChatPage({ params }: { params: { id: string } }) 
     priority: "normal",
   }
 
-  const messages = [
+  const [messages, setMessages] = useState<DisplayMessage[]>([
     {
-      id: 1,
+      id: "1",
       sender: "company",
       content: "この度は弊社の求人にご応募いただき、ありがとうございます。",
       timestamp: "10:30",
@@ -60,7 +76,7 @@ export default function CompanyChatPage({ params }: { params: { id: string } }) 
       type: "text",
     },
     {
-      id: 2,
+      id: "2",
       sender: "company",
       content: "書類選考の結果、面談をさせていただきたく思います。",
       timestamp: "10:31",
@@ -68,7 +84,7 @@ export default function CompanyChatPage({ params }: { params: { id: string } }) 
       type: "text",
     },
     {
-      id: 3,
+      id: "3",
       sender: "student",
       content: "ありがとうございます！ぜひよろしくお願いいたします。",
       timestamp: "11:15",
@@ -76,7 +92,7 @@ export default function CompanyChatPage({ params }: { params: { id: string } }) 
       type: "text",
     },
     {
-      id: 4,
+      id: "4",
       sender: "company",
       content: "面談の件でご連絡いたします。来週の火曜日14:00はいかがでしょうか？",
       timestamp: "14:30",
@@ -84,7 +100,7 @@ export default function CompanyChatPage({ params }: { params: { id: string } }) 
       type: "text",
     },
     {
-      id: 5,
+      id: "5",
       sender: "student",
       content: "",
       timestamp: "14:31",
@@ -93,7 +109,7 @@ export default function CompanyChatPage({ params }: { params: { id: string } }) 
       fileName: "履歴書.pdf",
       fileSize: "1.2MB",
     },
-  ]
+  ]);
 
   const timeSlots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"]
 
@@ -105,10 +121,66 @@ export default function CompanyChatPage({ params }: { params: { id: string } }) 
     "お疲れ様でした",
   ]
 
-  const handleSendMessage = () => {
-    if (message.trim()) {
-      console.log("Sending message:", message)
-      setMessage("")
+  const handleSendMessage = async () => {
+    if (!message.trim()) return;
+    const { data, error } = await supabase
+      .from('messages')
+      .insert([{
+        sender: 'company',
+        content: message.trim(),
+        company_id: params.companyId,
+        application_id: params.id,
+      }])
+      .select();
+    if (error) {
+      console.error('メッセージ送信エラー', error);
+    } else if (Array.isArray(data) && data.length > 0) {
+      const newMsg = data[0];
+      setMessages(prev => [
+        ...prev,
+        {
+          id: newMsg.id,
+          sender: newMsg.sender as 'company' | 'student',
+          content: newMsg.content,
+          timestamp: new Date(newMsg.created_at!).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isRead: false,
+          type: 'text',
+        }
+      ]);
+      setMessage('');
+
+      // --- 通知用の student_id を取得 ---
+      let studentId: string;
+      try {
+        const { data: appData, error: appError } = await supabase
+          .from('applications')
+          .select('student_id')
+          .eq('id', params.id)
+          .single();
+        if (appError || !appData) {
+          console.error('アプリケーション取得エラー', appError);
+          return;
+        }
+        // @ts-ignore: override missing generated schema for student_id
+        studentId = (appData as any).student_id;
+      } catch (e) {
+        console.error('アプリケーション取得例外', e);
+        return;
+      }
+
+      // --- notifications テーブルに挿入 ---
+      const { error: notifyError } = await supabase
+        .from('notifications')
+        .insert([{
+          recipient_type: 'student',
+          recipient_id: studentId,
+          resource: 'message',
+          resource_id: newMsg.id,
+          payload: { content: newMsg.content },
+        }]);
+      if (notifyError) {
+        console.error('通知送信エラー', notifyError);
+      }
     }
   }
 

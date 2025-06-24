@@ -52,6 +52,11 @@ const menuItems = [
     url: "/company/[companyID]/feedback",
     icon: Star,
   },
+  {
+    title: "設定",
+    url: "/company/[companyID]/notifications",
+    icon: Settings,
+  },
 ]
 
 export function CompanySidebar() {

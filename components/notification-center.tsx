@@ -29,72 +29,38 @@ export function NotificationCenter() {
 
   useEffect(() => {
     const fetchNotifications = async () => {
-      // messages
-      const { data: messages, error: msgError } = await supabase
-        .from("messages")
-        .select("id, content, created_at, is_read")
-      if (msgError) console.error(msgError)
+      // ① Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError) console.error(userError);
+      if (!user) return;
 
-      // applications
-      const { data: applications, error: appError } = await supabase
-        .from("applications")
-        .select("id, status, created_at, is_read")
-      if (appError) console.error(appError)
+      // Determine whether the user is a student or a company from metadata
+      const userRole = (user.user_metadata?.role as 'student' | 'company') ?? 'student';
+      const filterColumn = userRole === 'company' ? 'company_id' : 'student_id';
 
-      // interviews
-      const { data: interviews, error: intError } = await supabase
-        .from("interviews")
-        .select("id, date, start_time, status, is_read")
-      if (intError) console.error(intError)
+      // ② Fetch unified notifications for this user
+      const { data: rows, error: fetchError } = await supabase
+        .from("notifications")
+        .select("id, resource, resource_id, payload, is_read, created_at")
+        .eq(filterColumn, user.id)
+        .order("created_at", { ascending: false });
+      if (fetchError) console.error(fetchError);
 
-      // feedbacks
-      const { data: feedbacks, error: fbError } = await supabase
-        .from("feedbacks")
-        .select("id, overall_comment, created_at, is_read")
-      if (fbError) console.error(fbError)
+      // ③ Normalize into Notification[]
+      const combined: Notification[] = (rows ?? []).map(row => {
+        const pl = (row.payload ?? {}) as { title?: string; message?: string; link?: string };
+        return {
+          id: row.id,
+          type: row.resource as NotificationType,
+          title: pl.title ?? "通知",
+          message: pl.message ?? "",
+          time: new Date(row.created_at).toLocaleString(),
+          isRead: row.is_read,
+          link: pl.link ?? `/${row.resource}s/${row.resource_id}`,
+        };
+      });
 
-      // normalize and combine
-      const combined: Notification[] = [
-        ...(messages ?? []).map(m => ({
-          id: m.id,
-          type: "message" as const,
-          title: "新しいメッセージ",
-          message: m.content,
-          time: new Date(m.created_at).toLocaleString(),
-          isRead: m.is_read,
-          link: `/student/messages/${m.id}`,
-        })),
-        ...(applications ?? []).map(a => ({
-          id: a.id,
-          type: "application" as const,
-          title: "応募状況の更新",
-          message: `応募が「${a.status}」になりました`,
-          time: new Date(a.created_at).toLocaleString(),
-          isRead: a.is_read,
-          link: `/student/applications/${a.id}`,
-        })),
-        ...(interviews ?? []).map(i => ({
-          id: String(i.id),
-          type: "interview" as const,
-          title: "面接日程の確認",
-          message: `${i.date} ${i.start_time} に面接が予定されています`,
-          time: new Date(`${i.date}T${i.start_time}`).toLocaleString(),
-          isRead: i.is_read,
-          link: "/student/interviews",
-        })),
-        ...(feedbacks ?? []).map(fb => ({
-          id: fb.id,
-          type: "feedback" as const,
-          title: "新しいフィードバック",
-          message: fb.overall_comment,
-          time: new Date(fb.created_at).toLocaleString(),
-          isRead: fb.is_read,
-          link: `/student/feedback/${fb.id}`,
-        })),
-      ]
-      // sort by newest first
-      combined.sort((a, b) => new Date(b.time).getTime() - new Date(a.time).getTime())
-      setNotifications(combined)
+      setNotifications(combined);
     }
 
     fetchNotifications()
@@ -105,26 +71,11 @@ export function NotificationCenter() {
 
   // 通知を既読にする関数
   const markAsRead = async (id: string, type: NotificationType) => {
-    let error;
-    switch(type) {
-      case "message":
-        ({ error } = await supabase.from("messages").update({ is_read: true }).eq("id", id));
-        break;
-      case "application":
-        ({ error } = await supabase.from("applications").update({ is_read: true }).eq("id", id));
-        break;
-      case "interview":
-        ({ error } = await supabase
-          .from("interviews")
-          .update({ is_read: true })
-          .eq("id", Number(id))  // convert string back to number
-        );
-        break;
-      case "feedback":
-        ({ error } = await supabase.from("feedbacks").update({ is_read: true }).eq("id", id));
-        break;
-    }
-    if (error) console.error(`Failed to mark ${type} read:`, error);
+    const { error } = await supabase
+      .from("notifications")
+      .update({ is_read: true })
+      .eq("id", id);
+    if (error) console.error("Failed to mark read:", error);
     setNotifications(prev =>
       prev.map(n => n.id === id ? { ...n, isRead: true } : n)
     );
@@ -132,29 +83,14 @@ export function NotificationCenter() {
 
   // すべての通知を既読にする関数
   const markAllAsRead = async () => {
-    // update each table for unread items
-    const updateTable = async (table: "messages" | "applications" | "interviews" | "feedbacks", ids: string[]) => {
-      if (!ids.length) return;
-      let error;
-      if (table === "interviews") {
-        // interviews.id is numeric
-        const numIds = ids.map((id) => Number(id));
-        ({ error } = await supabase.from(table).update({ is_read: true }).in("id", numIds));
-      } else {
-        ({ error } = await supabase.from(table).update({ is_read: true }).in("id", ids));
-      }
-      if (error) console.error(`Failed to mark all ${table} read:`, error);
+    const unreadIds = notifications.filter(n => !n.isRead).map(n => n.id);
+    if (unreadIds.length) {
+      const { error } = await supabase
+        .from("notifications")
+        .update({ is_read: true })
+        .in("id", unreadIds);
+      if (error) console.error("Failed to mark all read:", error);
     }
-    const unreadByType = notifications.reduce<Record<NotificationType, string[]>>((acc, n) => {
-      if (!n.isRead) acc[n.type].push(n.id);
-      return acc;
-    }, { message: [], application: [], interview: [], system: [], feedback: [] });
-    await Promise.all([
-      updateTable("messages", unreadByType.message),
-      updateTable("applications", unreadByType.application),
-      updateTable("interviews", unreadByType.interview),
-      updateTable("feedbacks", unreadByType.feedback),
-    ]);
     setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
   }
 

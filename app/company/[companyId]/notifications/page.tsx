@@ -27,6 +27,7 @@ import {
   Edit,
   Save,
   RefreshCw,
+  User,
 } from "lucide-react"
 
 export default function NotificationsPage() {
@@ -210,7 +211,7 @@ export default function NotificationsPage() {
       <header className="bg-white border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">通知設定</h1>
+            <h1 className="text-2xl font-bold">設定</h1>
             <p className="text-sm text-gray-600">フィードバック送信・返信時の通知を管理</p>
           </div>
           <Button onClick={handleSaveSettings} className="flex items-center space-x-2">
@@ -221,11 +222,15 @@ export default function NotificationsPage() {
       </header>
 
       <div className="p-6">
-        <Tabs defaultValue="settings" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+        <Tabs defaultValue="profile" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-5">
+            <TabsTrigger value="profile" className="flex items-center space-x-2">
+              <User className="h-4 w-4" />
+              <span>プロフィール</span>
+            </TabsTrigger>
             <TabsTrigger value="settings" className="flex items-center space-x-2">
-              <Settings className="h-4 w-4" />
-              <span>通知設定</span>
+              <Bell className="h-4 w-4" />
+              <span>通知</span>
             </TabsTrigger>
             <TabsTrigger value="templates" className="flex items-center space-x-2">
               <Edit className="h-4 w-4" />
@@ -796,6 +801,34 @@ export default function NotificationsPage() {
                     </div>
                   ))}
                 </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="profile" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>プロフィール編集</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label htmlFor="company-name">会社名</Label>
+                  <Input id="company-name" type="text" placeholder="会社名を入力" />
+                </div>
+                <div>
+                  <Label htmlFor="company-logo">ロゴURL</Label>
+                  <Input id="company-logo" type="text" placeholder="ロゴのURLを入力" />
+                </div>
+                <div>
+                  <Label htmlFor="company-description">会社説明</Label>
+                  <Textarea
+                    id="company-description"
+                    placeholder="会社説明を入力"
+                    className="min-h-[100px]"
+                  />
+                </div>
+                <Button onClick={() => { /* TODO: save profile */ }} className="mt-4">
+                  保存
+                </Button>
               </CardContent>
             </Card>
           </TabsContent>
