@@ -36,11 +36,12 @@ import { useEffect } from "react"
 
 export default function ApplicantDetailPage() {
   const params = useParams()
-  const paramId = params.id
+  const paramCompanyId = Array.isArray(params.companyId) ? params.companyId[0] : params.companyId
+  const paramId = Array.isArray(params.id) ? params.id[0] : params.id
   if (!paramId) {
     return <div className="p-6 text-center">応募IDが不正です</div>
   }
-  const id = Array.isArray(paramId) ? paramId[0] : paramId
+  const id = paramId
   const [showInterviewDialog, setShowInterviewDialog] = useState(false)
   const [showFeedbackDialog, setShowFeedbackDialog] = useState(false)
   const [interviewDate, setInterviewDate] = useState("")
@@ -142,7 +143,7 @@ export default function ApplicantDetailPage() {
       <header className="bg-white border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Link href="/company/applications">
+            <Link href={`/company/${paramCompanyId}/applications`}>
               <Button variant="ghost" size="sm">
                 <ArrowLeft className="h-4 w-4 mr-2" />
                 応募者一覧に戻る

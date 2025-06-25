@@ -1,4 +1,7 @@
+
 "use client"
+
+import { v4 as uuidv4 } from 'uuid'
 
 import { useEffect } from "react"
 import { useParams } from 'next/navigation'
@@ -97,10 +100,10 @@ export default function ChatPage() {
           last_message_at: "", // placeholder
           unread_count: null,  // placeholder
         }]
-        console.log("mapped chatRooms:", mapped)
+        // console.log("mapped chatRooms:", mapped)
         setChatRooms(mapped)
         // Immediately after setChatRooms, chatRooms state is not updated yet, so log mapped here.
-        console.log("chatRooms fetched from Supabase:", mapped)
+        // console.log("chatRooms fetched from Supabase:", mapped)
       }
       setLoading(false)
     }
@@ -186,8 +189,8 @@ export default function ChatPage() {
   const companyStatus = currentRoom.application_status ?? "";
 
   // Debug logs for derived data
-  console.log("currentRoom:", currentRoom)
-  console.log("companyName:", companyName)
+  // console.log("currentRoom:", currentRoom)
+  // console.log("companyName:", companyName)
 
   const timeSlots = ["09:00", "10:00", "11:00", "13:00", "14:00", "15:00", "16:00", "17:00"]
 
@@ -234,10 +237,62 @@ export default function ChatPage() {
     }
   }
 
-  const handleFileUpload = (type: "image" | "file") => {
-    // ファイルアップロード処理
-    console.log("Uploading:", type)
-    setShowAttachmentMenu(false)
+  const handleFileUpload = async (type: "image" | "file") => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = type === "image" ? "image/*" : "*";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file || !applicationId) return;
+
+      // Generate a safe and unique file path using uuidv4
+      const extension = file.name.split('.').pop();
+      const filePath = `${applicationId}/${Date.now()}_${uuidv4()}.${extension}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("student-chat-uploads")
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from("student-chat-uploads").getPublicUrl(filePath);
+      const publicUrl = urlData.publicUrl;
+
+      const { data: inserted, error: insertError } = await supabase
+        .from("messages")
+        .insert({
+          application_id: applicationId,
+          company_id: companyId,
+          content: publicUrl,
+          sender: "student",
+          type,
+          is_read: false,
+          created_at: new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (insertError) {
+        console.error("message insert error:", insertError);
+      } else if (inserted) {
+        setMessagesData((prev) => [
+          ...prev,
+          {
+            id: inserted.id,
+            application_id: inserted.application_id,
+            content: inserted.content,
+            created_at: inserted.created_at,
+            is_read: inserted.is_read,
+            sender: inserted.sender,
+            type: inserted.type,
+          },
+        ]);
+      }
+    };
+    input.click();
+    setShowAttachmentMenu(false);
   }
 
   return (
@@ -280,21 +335,38 @@ export default function ChatPage() {
                 >
                   <p className="text-sm">{msg.content}</p>
                 </div>
-              ) : (
+              ) : msg.type === "image" ? (
+                <img
+                  src={msg.content}
+                  alt="アップロード画像"
+                  className="rounded-lg max-w-xs"
+                />
+              ) : msg.type === "file" ? (
                 <Card className="p-3 bg-white border border-gray-200">
                   <div className="flex items-center space-x-3">
                     <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
                       <FileText className="h-5 w-5 text-red-600" />
                     </div>
                     <div className="flex-1">
-                      <p className="text-sm font-semibold">{msg.content}</p>
+                      <a
+                        href={msg.content}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-semibold text-blue-600 underline break-all"
+                      >
+                        ファイルを開く
+                      </a>
                     </div>
-                    <Button variant="ghost" size="sm">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => window.open(msg.content, "_blank")}
+                    >
                       <Download className="h-4 w-4" />
                     </Button>
                   </div>
                 </Card>
-              )}
+              ) : null}
               <div className={`flex items-center space-x-1 mt-1 ${msg.sender === "student" ? "justify-end" : ""}`}>
                 <span className="text-xs text-gray-500">
                   {new Date(msg.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })}

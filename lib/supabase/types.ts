@@ -22,6 +22,7 @@ export type Database = {
           name: string | null
           next_date: string | null
           next_step: string | null
+          profile_id: string
           start_date: string
           status: string
           title: string | null
@@ -39,6 +40,7 @@ export type Database = {
           name?: string | null
           next_date?: string | null
           next_step?: string | null
+          profile_id: string
           start_date: string
           status?: string
           title?: string | null
@@ -56,6 +58,7 @@ export type Database = {
           name?: string | null
           next_date?: string | null
           next_step?: string | null
+          profile_id?: string
           start_date?: string
           status?: string
           title?: string | null
@@ -75,6 +78,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "applications_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "fk_applications_user_id__students_id"

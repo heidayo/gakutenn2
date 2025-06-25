@@ -19,7 +19,10 @@ import {
   Calendar,
   Paperclip,
   Send,
+  FileText,
+  Download,
 } from "lucide-react"
+import { v4 as uuidv4 } from 'uuid'
 import Link from "next/link"
 import { useParams } from "next/navigation"
 import { useState, useEffect } from "react"
@@ -70,8 +73,48 @@ export default function CompanyMessagesPage() {
     content: string
     timestamp: string
     isRead: boolean
-    type: "text" | "file"
+    type: "text" | "file" | "image"
   }
+  // handle file/image upload
+  const handleFileUpload = async (type: "file" | "image") => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = type === "image" ? "image/*" : "*";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file || !selectedChat) return;
+
+      const extension = file.name.split('.').pop();
+      const filePath = `${selectedChat}/${Date.now()}_${uuidv4()}.${extension}`;
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from("student-chat-uploads")
+        .upload(filePath, file);
+
+      if (uploadError) {
+        console.error("Upload error:", uploadError);
+        return;
+      }
+
+      const { data: urlData } = supabase.storage.from("student-chat-uploads").getPublicUrl(filePath);
+      const publicUrl = urlData.publicUrl;
+
+      const { error: insertError } = await supabase
+        .from("messages")
+        .insert({
+          application_id: selectedChat,
+          sender: "company",
+          content: publicUrl,
+          type,
+        });
+
+      if (insertError) {
+        console.error("message insert error:", insertError);
+      } else {
+        fetchMessages();
+      }
+    };
+    input.click();
+  };
 
   const [messageStats, setMessageStats] = useState<MessageStats>({
     total: 0,
@@ -505,7 +548,32 @@ export default function CompanyMessagesPage() {
                             : "bg-white border border-gray-200 text-gray-900"
                         }`}
                       >
-                        <p className="text-sm">{msg.content}</p>
+                        {msg.type === "text" ? (
+                          <p className="text-sm">{msg.content}</p>
+                        ) : msg.type === "image" ? (
+                          <img src={msg.content} alt="アップロード画像" className="rounded-lg max-w-xs" />
+                        ) : msg.type === "file" ? (
+                          <Card className="p-3 bg-white border border-gray-200">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center">
+                                <FileText className="h-5 w-5 text-red-600" />
+                              </div>
+                              <div className="flex-1">
+                                <a
+                                  href={msg.content}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm font-semibold text-blue-600 underline break-all"
+                                >
+                                  ファイルを開く
+                                </a>
+                              </div>
+                              <Button variant="ghost" size="sm" onClick={() => window.open(msg.content, "_blank")}>
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            </div>
+                          </Card>
+                        ) : null}
                       </div>
                       <div
                         className={`flex items-center space-x-1 mt-1 ${msg.sender === "company" ? "justify-end" : ""}`}
@@ -529,7 +597,12 @@ export default function CompanyMessagesPage() {
               {/* Message Input */}
               <div className="bg-white border-t px-6 py-4">
                 <div className="flex items-end space-x-3">
-                  <Button variant="ghost" size="sm" className="h-10 w-10 p-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-10 w-10 p-0"
+                    onClick={() => handleFileUpload("file")}
+                  >
                     <Paperclip className="h-5 w-5 text-gray-600" />
                   </Button>
                   <Button variant="ghost" size="sm" className="h-10 w-10 p-0">

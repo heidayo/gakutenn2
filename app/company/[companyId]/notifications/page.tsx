@@ -1,6 +1,8 @@
-"use client"
+ "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
+import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -82,50 +84,29 @@ export default function NotificationsPage() {
   const [lineToken, setLineToken] = useState("")
   const [testResult, setTestResult] = useState<string | null>(null)
   const [isTestLoading, setIsTestLoading] = useState(false)
+  const [notificationHistory, setNotificationHistory] = useState<any[]>([]);
+  const params = useParams();
+  const companyId = Array.isArray(params.companyId) ? params.companyId[0] : params.companyId;
 
-  // Mock notification history data
-  const notificationHistory = [
-    {
-      id: 1,
-      type: "email",
-      event: "feedback_sent",
-      recipient: "tanaka@company.com",
-      subject: "フィードバック送信完了",
-      status: "delivered",
-      timestamp: "2024-01-15T10:30:00Z",
-      studentName: "田中 太郎",
-    },
-    {
-      id: 2,
-      type: "slack",
-      event: "student_reply",
-      recipient: "#feedback-channel",
-      subject: "学生からの返信",
-      status: "delivered",
-      timestamp: "2024-01-15T09:15:00Z",
-      studentName: "佐藤 花子",
-    },
-    {
-      id: 3,
-      type: "push",
-      event: "reminder",
-      recipient: "mobile_device",
-      subject: "フィードバック期限リマインダー",
-      status: "failed",
-      timestamp: "2024-01-14T16:00:00Z",
-      studentName: "山田 次郎",
-    },
-    {
-      id: 4,
-      type: "email",
-      event: "weekly_summary",
-      recipient: "manager@company.com",
-      subject: "週次フィードバックサマリー",
-      status: "delivered",
-      timestamp: "2024-01-14T09:00:00Z",
-      studentName: "-",
-    },
-  ]
+  useEffect(() => {
+    if (!companyId) {
+      console.warn("companyId is undefined, skipping fetchNotifications");
+      return;
+    }
+    const fetchNotifications = async () => {
+      const { data, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .eq("company_id", companyId)
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.error("通知履歴取得エラー:", error);
+      } else {
+        setNotificationHistory(data);
+      }
+    };
+    fetchNotifications();
+  }, [companyId]);
 
   const handleEmailToggle = (key: string, value: boolean) => {
     setEmailNotifications((prev) => ({ ...prev, [key]: value }))
@@ -755,47 +736,23 @@ export default function NotificationsPage() {
               <CardContent>
                 <div className="space-y-4">
                   {notificationHistory.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                    >
+                    <div key={notification.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
                       <div className="flex items-center space-x-4">
-                        <div className="flex items-center space-x-2">
-                          {getTypeIcon(notification.type)}
-                          {getStatusIcon(notification.status)}
-                        </div>
+                        <div>{getTypeIcon(notification.resource)}</div>
                         <div>
-                          <p className="font-semibold">{notification.subject}</p>
-                          <p className="text-sm text-gray-600">
-                            {notification.type === "email" || notification.type === "slack"
-                              ? notification.recipient
-                              : notification.type === "push"
-                                ? "モバイルデバイス"
-                                : "LINE"}
-                          </p>
-                          {notification.studentName !== "-" && (
-                            <p className="text-xs text-gray-500">学生: {notification.studentName}</p>
+                          <p className="font-semibold">{notification.resource}</p>
+                          <p className="text-sm text-gray-600">{notification.resource_id}</p>
+                          {notification.payload && (
+                            <p className="text-xs text-gray-500">{JSON.stringify(notification.payload)}</p>
                           )}
                         </div>
                       </div>
                       <div className="text-right">
                         <p className="text-sm text-gray-600">
-                          {new Date(notification.timestamp).toLocaleString("ja-JP")}
+                          {new Date(notification.created_at).toLocaleString("ja-JP")}
                         </p>
-                        <Badge
-                          variant={
-                            notification.status === "delivered"
-                              ? "default"
-                              : notification.status === "failed"
-                                ? "destructive"
-                                : "secondary"
-                          }
-                        >
-                          {notification.status === "delivered"
-                            ? "配信済み"
-                            : notification.status === "failed"
-                              ? "失敗"
-                              : "保留中"}
+                        <Badge variant={notification.is_read ? "secondary" : "destructive"}>
+                          {notification.is_read ? "既読" : "未読"}
                         </Badge>
                       </div>
                     </div>
@@ -818,6 +775,10 @@ export default function NotificationsPage() {
                   <Label htmlFor="company-logo">ロゴURL</Label>
                   <Input id="company-logo" type="text" placeholder="ロゴのURLを入力" />
                 </div>
+                <div>
+                  <Label htmlFor="company-location">所在地</Label>
+                  <Input id="company-location" type="text" placeholder="所在地を入力" />
+                </div>                
                 <div>
                   <Label htmlFor="company-description">会社説明</Label>
                   <Textarea
