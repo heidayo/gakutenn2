@@ -215,10 +215,12 @@ export default async function ApplicationDetailPage({ params }: { params: Promis
             </Button>
           </Link>
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline">
-              <FileText className="h-4 w-4 mr-2" />
-              応募内容編集
-            </Button>
+            <Link href={`/student/jobs/${job?.id}/apply`}>
+              <Button variant="outline" className="w-full">
+                <FileText className="h-4 w-4 mr-2" />
+                応募内容編集
+              </Button>
+            </Link>
             <Button variant="outline">
               <Star className="h-4 w-4 mr-2" />
               求人を保存

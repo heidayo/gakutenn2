@@ -29,7 +29,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase/client";
 
 export default function EditJobPage() {
-  const { id } = useParams();
+  const { id, companyId } = useParams();
   const [formData, setFormData] = useState({
     // 基本情報
     title: "",
@@ -37,6 +37,10 @@ export default function EditJobPage() {
     description: "",
     responsibilities: [] as string[],
     requirements: [] as string[],
+
+    // 画像関連
+    imageFile: null as File | null,
+    imageUrl: "",
 
     // 勤務条件
     location: "",
@@ -94,34 +98,36 @@ export default function EditJobPage() {
         .from('jobs')
         .select(`
           id,
-         title,
-         category,
-         description,
-         responsibilities,
-         requirements,
-         location,
-         salary,
-         salary_type,
-         work_days,
-         work_hours,
-         duration,
-         start_date,
-         remote,
-         remote_details,
-         frequency,
-         benefits,
-         selection_steps,
-         mentor_name,
-         mentor_role,
-         mentor_experience,
-         mentor_message,
-         status,
-         publish_date,
-         tags,
-         created_at,
-         updated_at,
-         search_vector
-         `)
+          company_id,
+          title,
+          category,
+          description,
+          responsibilities,
+          requirements,
+          location,
+          salary,
+          salary_type,
+          work_days,
+          work_hours,
+          duration,
+          start_date,
+          remote,
+          remote_details,
+          frequency,
+          benefits,
+          selection_steps,
+          mentor_name,
+          mentor_role,
+          mentor_experience,
+          mentor_message,
+          status,
+          publish_date,
+          tags,
+          image_url,
+          created_at,
+          updated_at,
+          search_vector
+        `)
         .eq('id', jobId)
         .single();
       if (error) {
@@ -156,8 +162,10 @@ export default function EditJobPage() {
           mentorExperience: data.mentor_experience ?? "",
           mentorMessage: data.mentor_message ?? "",
           status: data.status ?? "draft",
-          publishDate: data.publish_date ?? "",
+          publishDate: data.publish_date ? data.publish_date.substring(0, 10) : "",
           tags: data.tags || [],
+          imageUrl: data.image_url ?? "",
+          imageFile: null, // ← 追加
         });
       }
     };
@@ -260,7 +268,7 @@ export default function EditJobPage() {
     }))
   }
 
-  const handleSave = (status: string) => {
+  const handleSave = async (status: string) => {
     // バリデーション
     const newErrors: { [key: string]: string } = {}
     if (!formData.title) newErrors.title = "職種名は必須です"
@@ -273,37 +281,118 @@ export default function EditJobPage() {
     }
 
     // 保存処理
-    console.log("Updating job:", { ...formData, status })
-
-    if (status === "published") {
-      alert("求人を更新・公開しました！")
-    } else {
-      alert("変更を保存しました！")
+    try {
+      if (!id || Array.isArray(id)) {
+        console.error("Invalid job id:", id);
+        return;
+      }
+      const jobId = id;
+      const updateData = {
+        title: formData.title,
+        category: formData.category,
+        description: formData.description,
+        responsibilities: formData.responsibilities,
+        requirements: formData.requirements,
+        location: formData.location,
+        salary: formData.salary ? Number(formData.salary) : null,
+        salary_type: formData.salaryType,
+        work_days: formData.workDays,
+        work_hours: formData.workHours,
+        duration: formData.duration,
+        start_date: formData.startDate,
+        remote: formData.remote,
+        remote_details: formData.remoteDetails,
+        frequency: formData.frequency,
+        benefits: formData.benefits,
+        selection_steps: formData.selectionSteps,
+        mentor_name: formData.mentorName,
+        mentor_role: formData.mentorRole,
+        mentor_experience: formData.mentorExperience,
+        mentor_message: formData.mentorMessage,
+        status: status,
+        publish_date: formData.publishDate ? formData.publishDate : null,
+        tags: formData.tags,
+        image_url: formData.imageUrl,
+      };
+      // Convert empty strings to null
+      const payload = Object.fromEntries(
+        Object.entries(updateData).map(([key, value]) => [
+          key,
+          value === "" ? null : value
+        ])
+      );
+      const { error } = await supabase
+        .from('jobs')
+        .update(payload)
+        .eq('id', jobId);
+      if (error) {
+        console.error("Error updating job:", error);
+        alert("求人の更新に失敗しました。");
+        return;
+      }
+      if (status === "published") {
+        alert("求人を更新・公開しました！");
+      } else {
+        alert("変更を保存しました！");
+      }
+      router.push(`/company/${companyId}/jobs`);
+    } catch (err) {
+      console.error(err);
+      alert("求人の更新中にエラーが発生しました。");
     }
   }
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!id || Array.isArray(id)) {
       console.error("Invalid job id:", id);
       return;
     }
     const jobId = id;
-    if (confirm("この求人を削除しますか？この操作は取り消せません。")) {
-      console.log("Deleting job:", jobId)
-      alert("求人を削除しました")
-      // 求人一覧に戻る
+    const confirmed = confirm("この求人を削除しますか？この操作は取り消せません。");
+    if (confirmed) {
+      try {
+        const { error } = await supabase
+          .from('jobs')
+          .delete()
+          .eq('id', jobId);
+        if (error) {
+          console.error('Error deleting job:', error);
+          alert('求人の削除に失敗しました。');
+        } else {
+          alert('求人を削除しました');
+          router.push(`/company/${companyId}/jobs`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert('求人の削除中にエラーが発生しました。');
+      }
     }
   }
 
-  const handleArchive = () => {
+  const handleArchive = async () => {
     if (!id || Array.isArray(id)) {
       console.error("Invalid job id:", id);
       return;
     }
     const jobId = id;
-    if (confirm("この求人をアーカイブしますか？")) {
-      console.log("Archiving job:", jobId)
-      alert("求人をアーカイブしました")
+    const confirmed = confirm("この求人をアーカイブしますか？アーカイブ後は求人は非公開になります。");
+    if (confirmed) {
+      try {
+        const { error } = await supabase
+          .from('jobs')
+          .update({ status: 'paused' })
+          .eq('id', jobId);
+        if (error) {
+          console.error('Error archiving job:', error);
+          alert('求人のアーカイブに失敗しました。');
+        } else {
+          alert('求人をアーカイブしました');
+          router.push(`/company/${companyId}/jobs`);
+        }
+      } catch (err) {
+        console.error(err);
+        alert('求人のアーカイブ中にエラーが発生しました。');
+      }
     }
   }
 
@@ -324,7 +413,7 @@ export default function EditJobPage() {
       <header className="bg-white border-b px-6 py-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <Button variant="ghost" size="sm" onClick={() => router.push('/company/jobs')}>
+            <Button variant="ghost" size="sm" onClick={() => router.push(`/company/${companyId}/jobs`)}>
               <ArrowLeft className="h-4 w-4 mr-2" />
               求人一覧に戻る
             </Button>
@@ -402,6 +491,26 @@ export default function EditJobPage() {
                       </Select>
                       {errors.category && <p className="text-sm text-red-500">{errors.category}</p>}
                     </div>
+                  </div>
+
+                  {/* 求人画像 */}
+                  <div className="space-y-4">
+                    <Label>求人画像</Label>
+                    { (formData.imageFile || formData.imageUrl) && (
+                      <img
+                        src={formData.imageFile ? URL.createObjectURL(formData.imageFile) : formData.imageUrl}
+                        alt="求人画像プレビュー"
+                        className="w-48 h-32 object-cover rounded border"
+                      />
+                    )}
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setFormData(prev => ({ ...prev, imageFile: file, imageUrl: file ? "" : prev.imageUrl }));
+                      }}
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -754,7 +863,7 @@ export default function EditJobPage() {
                   <div className="space-y-2">
                     <Label>公開開始日</Label>
                     <Input
-                      type="datetime-local"
+                      type="date"
                       value={formData.publishDate}
                       onChange={(e) => setFormData((prev) => ({ ...prev, publishDate: e.target.value }))}
                     />

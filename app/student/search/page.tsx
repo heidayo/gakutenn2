@@ -96,12 +96,24 @@ export default function SearchPage() {
     supabase
       .from("jobs")
       .select("*")
+      .eq("status", "published")
       .then(({ data, error }) => {
         console.log("jobs fetch →", { data, error })
         if (error) {
           console.error("Error fetching jobs:", error)
         } else {
-          setJobs(data || [])
+          const jobsWithUrls = (data ?? []).map((job) => {
+            let publicUrl: string | null | undefined = job.image_url
+            if (publicUrl && !publicUrl.startsWith("http")) {
+              const { data: urlData } = supabase
+                .storage
+                .from("company-jobs")
+                .getPublicUrl(publicUrl)
+              publicUrl = urlData?.publicUrl ?? null
+            }
+            return { ...job, image_url: publicUrl }
+          })
+          setJobs(jobsWithUrls)
         }
       })
   }, [])
@@ -751,7 +763,7 @@ export default function SearchPage() {
               <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
                 <div className="relative aspect-[16/9] overflow-hidden">
                   <img
-                    src="/placeholder.svg"
+                    src={job.image_url ?? "/placeholder.svg"}
                     alt={job.title}
                     className="w-full h-full object-cover transition-transform hover:scale-105 duration-300"
                     loading="lazy"

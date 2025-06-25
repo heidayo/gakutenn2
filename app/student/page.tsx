@@ -185,16 +185,41 @@ export default function StudentHomePage() {
 
   useEffect(() => {
     const fetchRecommended = async () => {
-      const { data, error } = await supabase
-        .from('jobs')
-        .select('*')
-        .order('publish_date', { ascending: false })
+      // ❶ 最新求人10件取得（画像パスも取得）※公開求人のみ
+      const { data: jobs, error } = await supabase
+        .from("jobs")
+        .select("id, title, location, duration, salary, work_hours, image_url")
+        .eq("status", "published")
+        .order("publish_date", { ascending: false })
         .limit(10)
+
       if (error) {
-        console.error('Error fetching recommended jobs:', error)
-      } else {
-        setRecommendedJobs(data || [])
+        console.error("Error fetching recommended jobs:", error)
+        return
       }
+
+      if (!jobs) {
+        setRecommendedJobs([])
+        return
+      }
+
+      // ❷ 画像パスを公開 URL に変換（Storage バケット: company-jobs）
+      const jobsWithUrls = jobs.map((job) => {
+        // image_url が既に http から始まる場合はそのまま使用
+        let publicUrl: string | null | undefined = job.image_url
+
+        // まだフル URL でなければ Storage から生成
+        if (publicUrl && !publicUrl.startsWith("http")) {
+          const { data } = supabase.storage
+            .from("company-jobs")
+            .getPublicUrl(publicUrl)
+          publicUrl = data?.publicUrl ?? null
+        }
+
+        return { ...job, image_url: publicUrl }
+      })
+
+      setRecommendedJobs(jobsWithUrls)
     }
     fetchRecommended()
   }, [])
@@ -489,7 +514,11 @@ export default function StudentHomePage() {
             <Link href={`/student/jobs/${job.id}`} key={job.id}>
               <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
                 <div className="relative">
-                  <img src={job.image || "/placeholder.svg"} alt={job.title} className="w-full h-24 object-cover" />
+                  <img
+                    src={job.image_url ?? "/placeholder.svg"}
+                    alt={job.title}
+                    className="w-full h-24 object-cover"
+                  />
                   {/* Bookmark */}
                   <div className="absolute top-2 right-2">
                     <button
@@ -516,7 +545,7 @@ export default function StudentHomePage() {
                   <div className="space-y-1 text-xs text-gray-600 mb-2">
                     <div className="flex items-center space-x-1">
                       <Clock className="h-3 w-3" />
-                      <span>{job.time}</span>
+                      <span>{job.work_hours}</span>
                     </div>
                     <div className="flex items-center space-x-1">
                       <MapPin className="h-3 w-3" />

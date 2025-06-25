@@ -63,6 +63,10 @@ interface FormData {
   mentorExperience: string;
   mentorMessage: string;
 
+  // 画像
+  imageFile?: File | null;
+  imagePreview?: string | null;
+
   // 公開設定
   status: string;
   publishDate: string;
@@ -109,6 +113,10 @@ export default function CreateJobPage() {
     mentorRole: "",
     mentorExperience: "",
     mentorMessage: "",
+
+    // 画像
+    imageFile: null,
+    imagePreview: null,
 
     // 公開設定
     status: "draft",
@@ -237,6 +245,7 @@ export default function CreateJobPage() {
     if (!formData.title) newErrors.title = "職種名は必須です";
     if (!formData.category) newErrors.category = "カテゴリは必須です";
     if (!formData.description) newErrors.description = "業務内容は必須です";
+    if (!formData.imageFile) newErrors.imageFile = "求人画像は必須です";
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -290,6 +299,39 @@ export default function CreateJobPage() {
       }
     }
 
+    // ─── 画像アップロード ─────────────────────────────
+    let imageUrl: string | null = null;
+
+    if (formData.imageFile) {
+      // 拡張子を保持したまま一意のファイル名を生成
+      const fileExt = formData.imageFile.name.split(".").pop();
+      const fileName = `${companyId ?? "common"}_${Date.now()}.${fileExt}`;
+
+      // Storage へアップロード
+      const { error: uploadErr } = await sb
+        .storage
+        .from("company-jobs")
+        .upload(fileName, formData.imageFile, {
+          upsert: false,          // 同名ファイルがある場合はエラー
+          cacheControl: "3600",
+          contentType: formData.imageFile.type,
+        });
+
+      if (uploadErr) {
+        console.error("画像アップロードエラー:", uploadErr);
+        alert("画像のアップロードに失敗しました。");
+        return;
+      }
+
+      // 公開 URL を取得（バケットを public 設定している前提）
+      const { data: urlData } = sb
+        .storage
+        .from("company-jobs")
+        .getPublicUrl(fileName);
+
+      imageUrl = urlData.publicUrl;
+    }
+
     // ─── 送信用データ整形 ─────────────────────────────
     const payload = {
       // ---- 必須 ----
@@ -297,6 +339,7 @@ export default function CreateJobPage() {
       status,
       title: formData.title,
       category: formData.category,
+      image_url: imageUrl,           // ★ 追加
       description: formData.description,
 
       // ---- 配列／詳細 ----
@@ -328,7 +371,7 @@ export default function CreateJobPage() {
 
       // ---- 公開設定 & メタ ----
       publish_date: formData.publishDate
-        ? new Date(formData.publishDate).toISOString()
+        ? formData.publishDate
         : null,
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -481,6 +524,32 @@ export default function CreateJobPage() {
                     />
                     {errors.description && <p className="text-sm text-red-500">{errors.description}</p>}
                     <p className="text-sm text-gray-500">{formData.description.length}/500文字</p>
+                  </div>
+
+                  {/* 画像登録欄 */}
+                  <div className="space-y-2">
+                    <Label>求人画像 *</Label>
+                    {formData.imagePreview && (
+                      <img
+                        src={formData.imagePreview}
+                        alt="プレビュー"
+                        className="h-32 w-auto object-cover border rounded"
+                      />
+                    )}
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      className={errors.imageFile ? "border-red-500" : ""}
+                      onChange={(e) => {
+                        const file = e.target.files?.[0] || null;
+                        setFormData((prev) => ({
+                          ...prev,
+                          imageFile: file,
+                          imagePreview: file ? URL.createObjectURL(file) : null,
+                        }));
+                      }}
+                    />
+                    {errors.imageFile && <p className="text-sm text-red-500">{errors.imageFile}</p>}
                   </div>
 
                   <div className="space-y-4">
@@ -819,7 +888,7 @@ export default function CreateJobPage() {
                   <div className="space-y-2">
                     <Label>公開開始日</Label>
                     <Input
-                      type="datetime-local"
+                      type="date"
                       value={formData.publishDate}
                       onChange={(e) => setFormData((prev) => ({ ...prev, publishDate: e.target.value }))}
                     />
@@ -868,7 +937,7 @@ export default function CreateJobPage() {
               <CardContent className="space-y-3">
                 <div className="flex items-center justify-between text-sm">
                   <span>基本情報</span>
-                  {formData.title && formData.category && formData.description ? (
+                  {formData.title && formData.category && formData.description && formData.imageFile ? (
                     <CheckCircle className="h-4 w-4 text-green-600" />
                   ) : (
                     <AlertCircle className="h-4 w-4 text-orange-600" />

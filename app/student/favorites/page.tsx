@@ -45,13 +45,27 @@ export default function FavoritesPage() {
       if (bmError) {
         console.error("Error fetching bookmarks:", bmError)
       } else {
-        setJobs(
-          bookmarks.map((b) => ({
-            ...b.job,
-            company: b.job.company.name,
-            savedAt: b.created_at
-          }))
-        )
+        const jobsWithUrls = bookmarks.map((b) => {
+          const job = b.job
+          // image_url がフル URL でなければ Storage から公開 URL を生成
+          let publicUrl: string | null | undefined = job.image_url
+          if (publicUrl && !publicUrl.startsWith("http")) {
+            const { data } = supabase
+              .storage
+              .from("company-jobs")
+              .getPublicUrl(publicUrl)
+            publicUrl = data?.publicUrl ?? null
+          }
+
+          return {
+            ...job,
+            company: job.company.name,
+            savedAt: b.created_at,
+            image_url: publicUrl,
+          }
+        })
+
+        setJobs(jobsWithUrls)
       }
     }
     fetchBookmarks()
@@ -190,7 +204,11 @@ export default function FavoritesPage() {
                 <Card className="overflow-hidden hover:shadow-md transition-shadow cursor-pointer">
                   <div className="flex">
                     <div className="relative w-24 h-20 flex-shrink-0">
-                      <img src={job.image || "/placeholder.svg"} alt={job.title} className="w-full h-full object-cover" />
+                      <img
+                        src={job.image_url ?? "/placeholder.svg"}
+                        alt={job.title}
+                        className="w-full h-full object-cover"
+                      />
                       <div className="absolute top-1 right-1">
                         <button
                           onClick={(e) => {

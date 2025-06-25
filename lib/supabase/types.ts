@@ -14,7 +14,7 @@ export type Database = {
           additional_info: string | null
           agree_terms: boolean
           available_days: string[]
-          company_id: string | null
+          company_id: string
           created_at: string
           id: string
           is_read: boolean
@@ -32,7 +32,7 @@ export type Database = {
           additional_info?: string | null
           agree_terms?: boolean
           available_days: string[]
-          company_id?: string | null
+          company_id: string
           created_at?: string
           id?: string
           is_read?: boolean
@@ -50,7 +50,7 @@ export type Database = {
           additional_info?: string | null
           agree_terms?: boolean
           available_days?: string[]
-          company_id?: string | null
+          company_id?: string
           created_at?: string
           id?: string
           is_read?: boolean
@@ -388,6 +388,7 @@ export type Database = {
           duration: string | null
           frequency: string | null
           id: string
+          image_url: string | null
           location: string | null
           mentor_experience: string | null
           mentor_message: string | null
@@ -419,6 +420,7 @@ export type Database = {
           duration?: string | null
           frequency?: string | null
           id?: string
+          image_url?: string | null
           location?: string | null
           mentor_experience?: string | null
           mentor_message?: string | null
@@ -450,6 +452,7 @@ export type Database = {
           duration?: string | null
           frequency?: string | null
           id?: string
+          image_url?: string | null
           location?: string | null
           mentor_experience?: string | null
           mentor_message?: string | null

@@ -29,7 +29,8 @@ export default function JobApplicationPage({ params }: { params: { id: string } 
     salary: number | null;
     salary_type: string | null;
     duration: string | null;
-    companies: { name: string } | null;
+    company_id: string;
+    companies: { id: string; name: string } | null;
   };
   const [job, setJob] = useState<Job | null>(null);
 
@@ -37,7 +38,7 @@ export default function JobApplicationPage({ params }: { params: { id: string } 
     const fetchJob = async () => {
       const { data, error } = await supabase
         .from("jobs")
-        .select("id, title, publish_date, salary, salary_type, duration, companies(name)")
+        .select("id, title, publish_date, salary, salary_type, duration, company_id, companies(id, name)")
         .eq("id", params.id)
         .single();
       if (error) {
@@ -100,6 +101,18 @@ export default function JobApplicationPage({ params }: { params: { id: string } 
       return
     }
 
+    // プロフィールIDを取得
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("user_id")
+      .eq("user_id", user.id)
+      .single();
+    if (profileError || !profile) {
+      console.error("プロフィールの取得に失敗しました:", profileError);
+      alert("プロフィール情報の取得に失敗しました。");
+      return;
+    }
+
     const availableDaysJapanese = formData.availableDays.map(dayId =>
       weekDays.find(d => d.id === dayId)?.label ?? dayId
     );
@@ -107,16 +120,16 @@ export default function JobApplicationPage({ params }: { params: { id: string } 
     // applications テーブルに挿入
     const { error } = await supabase
       .from("applications")
-      .insert([
-        {
-          job_id: params.id,
-          user_id: user.id,
-          available_days: availableDaysJapanese,
-          start_date: formData.startDate,
-          additional_info: formData.additionalInfo,
-          agree_terms: formData.agreeTerms,
-        },
-      ])
+      .insert({
+        job_id: params.id,
+        user_id: user.id,
+        profile_id: profile.user_id,
+        company_id: job.company_id,
+        available_days: availableDaysJapanese,
+        start_date: formData.startDate,
+        additional_info: formData.additionalInfo,
+        agree_terms: formData.agreeTerms,
+      })
 
     if (error) {
       console.error("応募の保存に失敗しました:", error)
