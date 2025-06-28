@@ -20,7 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger, SheetClose } from "@/components/ui/sheet"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { cn } from "@/lib/utils"
 import Link from "next/link"
@@ -80,7 +80,7 @@ export default function SearchPage() {
     fetchSavedJobs()
   }, [])
   // 時給レンジ
-  const [hourlyRange, setHourlyRange] = useState<[number, number]>([1000, 3000])
+  const [hourlyRange, setHourlyRange] = useState<[number, number]>([0, 5000])
 
   // デバッグ: jobsテーブルのIDを取得してログ出力
   useEffect(() => {
@@ -401,7 +401,6 @@ export default function SearchPage() {
                   <Collapsible open={expandedSections.salary} onOpenChange={() => toggleSection("salary")}>
                     <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                       <div className="flex items-center space-x-3">
-                        <Yen className="h-5 w-5 text-gray-600" />
                         <span className="text-sm font-medium">給与体系</span>
                       </div>
                       <ChevronDown className={`h-4 w-4 transition-transform ${expandedSections.salary ? "rotate-180" : ""}`} />
@@ -429,12 +428,12 @@ export default function SearchPage() {
                         ))}
                       </div>
                       {filters.salary.includes("時給") && (
-                        <div className="mt-4">
+                        <div className="mt-4 -mx-3 px-3">
                           <span className="text-xs text-gray-500">時給範囲</span>
                           <Slider
                             value={hourlyRange}
                             onValueChange={(value) => setHourlyRange(value as [number, number])}
-                            min={500}
+                            min={0}
                             max={5000}
                             step={100}
                             className="w-full mt-2"
@@ -484,7 +483,6 @@ export default function SearchPage() {
                   <Collapsible open={expandedSections.jobType} onOpenChange={() => toggleSection("jobType")}>
                     <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                       <div className="flex items-center space-x-3">
-                        <Briefcase className="h-5 w-5 text-gray-600" />
                         <span className="text-sm font-medium">職種</span>
                       </div>
                       <ChevronDown
@@ -613,7 +611,6 @@ export default function SearchPage() {
                   <Collapsible open={expandedSections.benefits} onOpenChange={() => toggleSection("benefits")}>
                     <CollapsibleTrigger className="flex items-center justify-between w-full p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
                       <div className="flex items-center space-x-3">
-                        <Sparkles className="h-5 w-5 text-gray-600" />
                         <span className="text-sm font-medium">待遇</span>
                       </div>
                       <ChevronDown
@@ -731,7 +728,9 @@ export default function SearchPage() {
                     <Button onClick={resetFilters} variant="outline" className="flex-1">
                       リセット
                     </Button>
-                    <Button className="flex-1">適用</Button>
+                    <SheetClose asChild>
+                      <Button className="flex-1">適用</Button>
+                    </SheetClose>
                   </div>
                 </div>
               </SheetContent>
