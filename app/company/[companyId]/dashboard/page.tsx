@@ -50,8 +50,6 @@ export default function CompanyDashboard() {
     job: string
     appliedDate: string
     status: string
-    rating: number
-    university: string
   }
 
   interface Interview {
@@ -104,20 +102,51 @@ export default function CompanyDashboard() {
         sb.from("applications").select("id", { count: "exact", head: true }).eq("company_id", companyId).eq("status", "合格"),
       ])
 
-      // ------ Upcoming interviews ------
-      const { data: interviewRows } = await sb
+      // ------ Upcoming interviews (manual resolution) ------
+      // 1) fetch raw interview records
+      const { data: interviewRows, error: interviewError } = await sb
         .from("interviews")
-        .select("id,date,time,type,job:title,profiles!inner(full_name)")
+        .select("id,applicant_id,job_id,date,start_time,type")
         .eq("company_id", companyId)
         .gte("date", new Date().toISOString().slice(0, 10))
-        .order("date")
+        .order("date", { ascending: true })
+      if (interviewError) console.error("Interview fetch error:", interviewError)
+
+      // 2) fetch all related profiles based on user_id
+      const applicantIds = Array.from(new Set((interviewRows ?? []).map((r: any) => r.applicant_id)))
+      const { data: profileRows } = await sb
+        .from("profiles")
+        .select("user_id,full_name")
+        .in("user_id", applicantIds)
+
+      // 3) fetch job titles
+      const jobIds = Array.from(new Set((interviewRows ?? []).map((r: any) => r.job_id)))
+      const { data: interviewJobRows } = await sb
+        .from("jobs")
+        .select("id,title")
+        .in("id", jobIds)
+
+      // 4) map interviews with names/titles
+      const realInterviews = (interviewRows ?? []).map((row: any) => {
+        const profile = profileRows?.find((p: any) => p.user_id === row.applicant_id)
+        const job = interviewJobRows?.find((j: any) => j.id === row.job_id)
+        return {
+          id: row.id,
+          applicant: profile?.full_name ?? row.applicant_id,
+          job: job?.title ?? row.job_id,
+          date: new Date(row.date).toLocaleDateString("ja-JP", { year: "numeric", month: "long", day: "numeric" }),
+          time: row.start_time,
+          type: row.type,
+        }
+      })
+      setUpcomingInterviews(realInterviews)
 
       // ------ Recent applications ------
       const { data: recentAppRows } = await sb
         .from("applications")
-        .select("id,applied_at,status,rating,job:title,profiles!inner(full_name,university)")
+        .select("id,name,title,created_at,status")
         .eq("company_id", companyId)
-        .order("applied_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(3)
 
       // ------ Job performance ------
@@ -141,27 +170,15 @@ export default function CompanyDashboard() {
       })
 
       setRecentApplications(
-        recentAppRows?.map((r: any) => ({
+        (recentAppRows ?? []).map((r: any) => ({
           id: r.id,
-          name: r.profiles.full_name,
-          university: r.profiles.university,
-          job: r.job,
-          appliedDate: new Date(r.applied_at).toLocaleDateString("ja-JP"),
+          name: r.name,
+          job: r.title,
+          appliedDate: new Date(r.created_at).toLocaleDateString("ja-JP"),
           status: r.status,
-          rating: r.rating,
-        })) ?? []
+        }))
       )
 
-      setUpcomingInterviews(
-        interviewRows?.map((row: any) => ({
-          id: row.id,
-          applicant: row.profiles.full_name,
-          job: row.job,
-          date: row.date,
-          time: row.time,
-          type: row.type,
-        })) ?? []
-      )
 
       setJobPerformance(
         jobRows?.map((row: any) => ({
@@ -208,6 +225,16 @@ export default function CompanyDashboard() {
         return "bg-gray-100 text-gray-800"
     }
   }
+
+  // Group upcoming interviews by date
+  const groupedInterviewsByDate = upcomingInterviews.reduce(
+    (acc: Record<string, Interview[]>, interview) => {
+      const key = interview.date
+      if (!acc[key]) acc[key] = []
+      acc[key].push(interview)
+      return acc
+    }, {}
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -363,22 +390,18 @@ export default function CompanyDashboard() {
                   <div key={application.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                     <div className="flex items-center space-x-3">
                       <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center">
-                        <span className="text-white font-bold text-sm">{application.name.charAt(0)}</span>
+                        <span className="text-white font-bold text-sm">{application.name?.charAt(0) ?? ""}</span>
                       </div>
                       <div>
                         <h4 className="font-semibold text-sm">{application.name}</h4>
-                        <p className="text-xs text-gray-600">{application.university}</p>
                         <p className="text-xs text-gray-500">{application.job}</p>
+                        <p className="text-xs text-gray-600">{application.appliedDate}</p>
                       </div>
                     </div>
                     <div className="text-right">
                       <Badge className={`${getStatusColor(application.status)} text-xs`}>
                         {application.status}
                       </Badge>
-                      <div className="flex items-center space-x-1 mt-1">
-                        <Star className="h-3 w-3 text-yellow-500 fill-current" />
-                        <span className="text-xs font-semibold">{application.rating}</span>
-                      </div>
                     </div>
                   </div>
                 ))}
@@ -401,27 +424,24 @@ export default function CompanyDashboard() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {upcomingInterviews.map((interview) => (
-                  <div key={interview.id} className="border rounded-lg p-3">
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <h4 className="font-semibold text-sm">{interview.applicant}</h4>
-                        <p className="text-xs text-gray-600">{interview.job}</p>
-                        <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500">
-                          <div className="flex items-center space-x-1">
-                            <Calendar className="h-3 w-3" />
-                            <span>{interview.date}</span>
-                          </div>
-                          <div className="flex items-center space-x-1">
+                {Object.entries(groupedInterviewsByDate).map(([date, interviews]) => (
+                  <div key={date} className="space-y-2">
+                    <h4 className="font-semibold text-sm">{date}</h4>
+                    {interviews.map((iv) => (
+                      <div key={iv.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div>
+                          <h5 className="text-sm font-medium">{iv.applicant}</h5>
+                          <div className="flex items-center space-x-2 text-xs text-gray-500">
                             <Clock className="h-3 w-3" />
-                            <span>{interview.time}</span>
+                            <span>{iv.time}</span>
+                            <Badge variant="outline" className="text-xs ml-2">{iv.type}</Badge>
                           </div>
                         </div>
+                        <Badge variant="outline" className="text-xs">
+                          {iv.job}
+                        </Badge>
                       </div>
-                      <Badge variant="outline" className="text-xs">
-                        {interview.type}
-                      </Badge>
-                    </div>
+                    ))}
                   </div>
                 ))}
                 {upcomingInterviews.length === 0 && (
