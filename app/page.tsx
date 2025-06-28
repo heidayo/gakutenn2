@@ -42,6 +42,7 @@ type LandingFeature = {
 export default function LandingPage() {
   const [stats, setStats] = useState({ applications: 0, interviews: 0, averageRating: 0 })
   const [features, setFeatures] = useState<LandingFeature[] | null>(null)
+  const [recommendedJobs, setRecommendedJobs] = useState<any[]>([])
   const router = useRouter()
   const [searchQuery, setSearchQuery] = useState("")
   const handleSearch = (e: React.FormEvent<HTMLFormElement>) => {
@@ -111,6 +112,38 @@ export default function LandingPage() {
     }
 
     fetchStatsAndFeatures()
+  }, [])
+
+  useEffect(() => {
+    const fetchRecommended = async () => {
+      const { data: jobs, error } = await supabase
+        .from("jobs")
+        .select("id, title, location, duration, salary, salary_type, work_hours, image_url")
+        .eq("status", "published")
+        .order("publish_date", { ascending: false })
+        .limit(10)
+
+      if (error) {
+        console.error("Error fetching recommended jobs:", error)
+        return
+      }
+      if (!jobs) {
+        setRecommendedJobs([])
+        return
+      }
+      const jobsWithUrls = jobs.map((job) => {
+        let publicUrl = job.image_url
+        if (publicUrl && !publicUrl.startsWith("http")) {
+          const { data } = supabase.storage
+            .from("company-jobs")
+            .getPublicUrl(publicUrl)
+          publicUrl = data?.publicUrl ?? null
+        }
+        return { ...job, image_url: publicUrl }
+      })
+      setRecommendedJobs(jobsWithUrls)
+    }
+    fetchRecommended()
   }, [])
 
   // --- Supabase data fetch ---
@@ -192,6 +225,36 @@ export default function LandingPage() {
                   </Button>
                 </Link>
               </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Recommended Jobs */}
+        <section id="recommended-jobs" className="w-full py-12 md:py-24 bg-white">
+          <div className="container px-4 md:px-6">
+            <h2 className="text-2xl font-bold mb-6">おすすめ求人</h2>
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {recommendedJobs.map((job) => (
+                <Card key={job.id} className="hover:shadow-lg transition-shadow">
+                  {job.image_url && (
+                    <img src={job.image_url} alt={job.title} className="w-full h-40 object-cover rounded-t-md" />
+                  )}
+                  <div className="p-4">
+                    <CardTitle className="text-lg">{job.title}</CardTitle>
+                    <CardDescription>
+                      <div className="text-sm text-gray-600">{job.location}</div>
+                      <div className="text-sm text-gray-600">{job.duration}</div>
+                      <div className="text-sm text-gray-600">
+                        {job.salary && job.salary_type ? `${job.salary}/${job.salary_type}` : job.salary}
+                      </div>
+                      <div className="text-sm text-gray-600">{job.work_hours}</div>
+                    </CardDescription>
+                    <Link href={`/jobs/${job.id}`} className="text-primary-500 hover:underline mt-2 block">
+                      詳細を見る →
+                    </Link>
+                  </div>
+                </Card>
+              ))}
             </div>
           </div>
         </section>
