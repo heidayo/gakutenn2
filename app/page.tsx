@@ -1,6 +1,7 @@
 'use client'
 import { Button } from "@/components/ui/button"
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardHeader, CardTitle } from "@/components/ui/card"
+import { CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Logo, AnimatedLogo } from "@/components/logo"
@@ -15,6 +16,7 @@ import {
   ArrowRight,
   Smartphone,
   Monitor,
+  MapPin,
 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -232,27 +234,35 @@ export default function LandingPage() {
         {/* Recommended Jobs */}
         <section id="recommended-jobs" className="w-full py-12 md:py-24 bg-white">
           <div className="container px-4 md:px-6">
-            <h2 className="text-2xl font-bold mb-6">おすすめ求人</h2>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold">おすすめ求人</h2>
+              <Link href="/search" className="text-primary-500 hover:underline">
+                すべて見る →
+              </Link>
+            </div>
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {recommendedJobs.map((job) => (
                 <Card key={job.id} className="hover:shadow-lg transition-shadow">
                   {job.image_url && (
                     <img src={job.image_url} alt={job.title} className="w-full h-40 object-cover rounded-t-md" />
                   )}
-                  <div className="p-4">
-                    <CardTitle className="text-lg">{job.title}</CardTitle>
-                    <CardDescription>
-                      <div className="text-sm text-gray-600">{job.location}</div>
-                      <div className="text-sm text-gray-600">{job.duration}</div>
-                      <div className="text-sm text-gray-600">
-                        {job.salary && job.salary_type ? `${job.salary}/${job.salary_type}` : job.salary}
+                  <CardContent className="p-3 pt-2">
+                    <h3 className="font-bold text-lg mb-2 line-clamp-2 leading-tight">{job.title}</h3>
+                    <div className="space-y-1 text-xs text-gray-600 mb-2">
+                      <div className="flex items-center space-x-1">
+                        <Clock className="h-3 w-3" />
+                        <span>{job.work_hours}</span>
                       </div>
-                      <div className="text-sm text-gray-600">{job.work_hours}</div>
-                    </CardDescription>
+                      <div className="flex items-center space-x-1">
+                        <MapPin className="h-3 w-3" />
+                        <span>{job.location}</span>
+                      </div>
+                    </div>
+                    <div className="text-lg font-bold text-green-600 mb-2">¥{job.salary}</div>
                     <Link href={`/jobs/${job.id}`} className="text-primary-500 hover:underline mt-2 block">
                       詳細を見る →
                     </Link>
-                  </div>
+                  </CardContent>
                 </Card>
               ))}
             </div>
@@ -262,33 +272,35 @@ export default function LandingPage() {
         {/* Key Features */}
         <section id="features" className="w-full py-12 md:py-24 lg:py-32">
           <div className="container px-4 md:px-6">
-            <div className="flex flex-col items-center justify-center space-y-4 text-center">
-              <Logo variant="icon" size="lg" className="mb-4" />
-              <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">学転インターンの特徴</h2>
-              <p className="max-w-[900px] text-gray-600 md:text-xl/relaxed">
-                従来の求人サイトとは違う、キャリア転換にフォーカスした新しいプラットフォーム
-              </p>
-            </div>
-            <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-3 lg:gap-12">
-              {features?.map((f) => {
-                const Icon =
-                  iconMap[f.icon as keyof typeof iconMap] ?? MessageSquare
-                return (
-                  <Card
-                    key={f.id}
-                    className="border-2 hover:border-blue-200 transition-colors"
-                  >
-                    <CardHeader>
-                      <Icon
-                        className={`h-10 w-10 text-${f.color}-600 mb-2`}
-                      />
-                      <CardTitle>{f.title}</CardTitle>
-                      <CardDescription>{f.description}</CardDescription>
-                    </CardHeader>
-                  </Card>
-                )
-              })}
-            </div>
+            <Card className="bg-white shadow-lg rounded-lg p-8 lg:p-36">
+              <div className="flex flex-col items-center justify-center space-y-4 text-center">
+                <Logo variant="icon" size="lg" className="mb-4" />
+                <h2 className="text-3xl font-bold tracking-tighter sm:text-5xl">学転インターンの特徴</h2>
+                <p className="max-w-[900px] text-gray-600 md:text-xl/relaxed">
+                  従来の求人サイトとは違う、キャリア転換にフォーカスした新しいプラットフォーム
+                </p>
+              </div>
+              <div className="mx-auto grid max-w-5xl items-center gap-6 py-12 lg:grid-cols-3 lg:gap-12">
+                {features?.map((f) => {
+                  const Icon =
+                    iconMap[f.icon as keyof typeof iconMap] ?? MessageSquare
+                  return (
+                    <Card
+                      key={f.id}
+                      className="border-2 hover:border-blue-200 transition-colors"
+                    >
+                      <CardHeader>
+                        <Icon
+                          className={`h-10 w-10 text-${f.color}-600 mb-2`}
+                        />
+                        <CardTitle>{f.title}</CardTitle>
+                        <CardDescription>{f.description}</CardDescription>
+                      </CardHeader>
+                    </Card>
+                  )
+                })}
+              </div>
+            </Card>
           </div>
         </section>
 
