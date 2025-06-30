@@ -82,6 +82,29 @@ export default function NotificationsPage() {
 
   const [slackWebhook, setSlackWebhook] = useState("")
   const [lineToken, setLineToken] = useState("")
+  const [companyEmail, setCompanyEmail] = useState("")
+  const [companyPhone, setCompanyPhone] = useState("")
+  const [companyName, setCompanyName] = useState("")
+  const [companyPostalCode, setCompanyPostalCode] = useState("")
+  const [companyAddress, setCompanyAddress] = useState("")
+  const [companyDescription, setCompanyDescription] = useState("")
+  const industries = [
+    "IT・ソフトウェア",
+    "Webサービス・アプリ",
+    "ゲーム・エンタメ",
+    "金融・保険",
+    "商社・流通",
+    "製造業",
+    "建設・不動産",
+    "コンサルティング",
+    "広告・マーケティング",
+    "メディア・出版",
+    "教育・研修",
+    "医療・ヘルスケア",
+    "人材・派遣",
+    "その他",
+  ]
+  const [companyIndustry, setCompanyIndustry] = useState("")
   const [testResult, setTestResult] = useState<string | null>(null)
   const [isTestLoading, setIsTestLoading] = useState(false)
   const [notificationHistory, setNotificationHistory] = useState<any[]>([]);
@@ -107,6 +130,71 @@ export default function NotificationsPage() {
     };
     fetchNotifications();
   }, [companyId]);
+
+  useEffect(() => {
+    if (!companyId) return
+    const fetchCompany = async () => {
+      const { data, error } = await supabase
+        .from("company_profiles")
+        .select("name, address, postal_code, email, phone, industry, description")
+        .eq("company_id", companyId)
+        .single()
+      if (error) {
+        console.error("会社情報取得エラー:", error)
+      } else if (data) {
+        setCompanyName(data.name)
+        setCompanyPostalCode(data.postal_code || "")
+        setCompanyAddress(data.address || "")
+        setCompanyEmail(data.email || "")
+        setCompanyPhone(data.phone || "")
+        setCompanyIndustry(data.industry || "")
+        setCompanyDescription(data.description || "")
+      }
+    }
+    fetchCompany()
+  }, [companyId])
+  // Auto-fill address when postal code changes
+  useEffect(() => {
+    // Remove hyphen and check for 7 digits
+    const zip = companyPostalCode.replace(/-/g, "");
+    if (/^\d{7}$/.test(zip)) {
+      fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zip}`)
+        .then((res) => res.json())
+        .then((json) => {
+          if (json.results && json.results.length > 0) {
+            const { address1, address2, address3 } = json.results[0];
+            setCompanyAddress(`${address1}${address2}${address3}`);
+          }
+        })
+        .catch((err) => {
+          console.error("住所自動取得エラー:", err);
+        });
+    }
+  }, [companyPostalCode]);
+
+  const handleSaveProfile = async () => {
+    if (!companyId) {
+      console.error("companyId is undefined");
+      return;
+    }
+    const payload = {
+      company_id: companyId!,
+      name: companyName,
+      postal_code: companyPostalCode,
+      address: companyAddress,
+      email: companyEmail,
+      phone: companyPhone,
+      industry: companyIndustry,
+      description: companyDescription,
+    }
+    const { error } = await supabase.from("company_profiles").upsert(payload, { onConflict: "company_id" })
+    if (error) {
+      console.error("プロフィール保存エラー:", error)
+      alert("プロフィールの保存に失敗しました")
+    } else {
+      alert("プロフィールを保存しました")
+    }
+  }
 
   const handleEmailToggle = (key: string, value: boolean) => {
     setEmailNotifications((prev) => ({ ...prev, [key]: value }))
@@ -769,25 +857,84 @@ export default function NotificationsPage() {
               <CardContent className="space-y-4">
                 <div>
                   <Label htmlFor="company-name">会社名</Label>
-                  <Input id="company-name" type="text" placeholder="会社名を入力" />
+                  <Input
+                    id="company-name"
+                    type="text"
+                    placeholder="会社名を入力"
+                    value={companyName}
+                    onChange={(e) => setCompanyName(e.target.value)}
+                  />
                 </div>
                 <div>
-                  <Label htmlFor="company-logo">ロゴURL</Label>
-                  <Input id="company-logo" type="text" placeholder="ロゴのURLを入力" />
+                  <Label htmlFor="company-postal-code">郵便番号</Label>
+                  <Input
+                    id="company-postal-code"
+                    type="text"
+                    placeholder="000-0000"
+                    value={companyPostalCode}
+                    onChange={(e) => setCompanyPostalCode(e.target.value)}
+                  />
                 </div>
                 <div>
-                  <Label htmlFor="company-location">所在地</Label>
-                  <Input id="company-location" type="text" placeholder="所在地を入力" />
-                </div>                
+                  <Label htmlFor="company-address">住所</Label>
+                  <Input
+                    id="company-address"
+                    type="text"
+                    placeholder="住所を入力"
+                    value={companyAddress}
+                    onChange={(e) => setCompanyAddress(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="company-email">メールアドレス</Label>
+                  <Input
+                    id="company-email"
+                    type="email"
+                    placeholder="メールアドレスを入力"
+                    value={companyEmail}
+                    onChange={(e) => setCompanyEmail(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="company-phone">電話番号</Label>
+                  <Input
+                    id="company-phone"
+                    type="tel"
+                    placeholder="電話番号を入力"
+                    value={companyPhone}
+                    onChange={(e) => setCompanyPhone(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="company-industry">業種</Label>
+                  <Select
+                    value={companyIndustry}
+                    onValueChange={(value) => setCompanyIndustry(value)}
+                  >
+                    <SelectTrigger id="company-industry">
+                      <SelectValue placeholder="業種を選択" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {industries.map((item) => (
+                        <SelectItem key={item} value={item}>
+                          {item}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
                 <div>
                   <Label htmlFor="company-description">会社説明</Label>
                   <Textarea
                     id="company-description"
                     placeholder="会社説明を入力"
                     className="min-h-[100px]"
+                    value={companyDescription}
+                    onChange={(e) => setCompanyDescription(e.target.value)}
                   />
                 </div>
-                <Button onClick={() => { /* TODO: save profile */ }} className="mt-4">
+
+                <Button onClick={handleSaveProfile} className="mt-4">
                   保存
                 </Button>
               </CardContent>

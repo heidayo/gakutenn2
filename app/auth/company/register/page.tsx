@@ -55,7 +55,6 @@ export default function CompanyRegisterPage() {
     building: "",
 
     // ステップ4: 権限・同意
-    role: "",
     termsAccepted: false,
     privacyAccepted: false,
     marketingAccepted: false,
@@ -91,8 +90,8 @@ export default function CompanyRegisterPage() {
 
     if (!formData.companyName) newErrors.companyName = "会社名は必須です"
     if (!formData.industry) newErrors.industry = "業界は必須です"
-    if (!formData.website) newErrors.website = "ウェブサイトは必須です"
-    else if (!/^https?:\/\/.+/.test(formData.website)) {
+    // `website` is optional; validate format only if provided
+    if (formData.website && !/^https?:\/\/.+/.test(formData.website)) {
       newErrors.website = "有効なURLを入力してください（http://またはhttps://）"
     }
 
@@ -118,7 +117,6 @@ export default function CompanyRegisterPage() {
   const validateStep4 = () => {
     const newErrors: Record<string, string> = {}
 
-    if (!formData.role) newErrors.role = "権限ロールは必須です"
     if (!formData.termsAccepted) newErrors.termsAccepted = "利用規約への同意は必須です"
     if (!formData.privacyAccepted) newErrors.privacyAccepted = "プライバシーポリシーへの同意は必須です"
 
@@ -166,9 +164,8 @@ export default function CompanyRegisterPage() {
             first_name: formData.firstName,
             last_name: formData.lastName,
             phone: formData.phone,
-            role: formData.role,
           },
-          emailRedirectTo: `${location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       })
 
@@ -193,6 +190,7 @@ export default function CompanyRegisterPage() {
           user_id: authData.user.id,
           address: fullAddress || null, // 1本化した住所
           email: formData.email,
+          is_approved: false,  // 新規登録は承認待ちステータスに設定
           // そのほかスキーマに存在する列のみ指定
         }
 
@@ -201,10 +199,29 @@ export default function CompanyRegisterPage() {
           setErrors({ submit: companyError.message })
           return
         }
+
+        // 3) クライアント側で company_profiles にもレコード登録 (トリガー不要)
+        const profilePayload = {
+          id: authData.user.id,
+          company_id: authData.user.id,
+          postal_code: formData.postalCode,
+          address: fullAddress || null,
+          // 必要に応じて他のカラムも追加
+          website: formData.website || null,
+          description: formData.description || null,
+        }
+        const { error: profileError } = await supabase
+          .from("company_profiles")
+          .insert(profilePayload)
+        if (profileError) {
+          setErrors({ submit: profileError.message })
+          return
+        }
       }
 
-      // 3) 完了ページへ遷移
-      router.push("/auth/company/register/complete")
+      // 4) 承認待ちページへ遷移
+      await router.push("/auth/company/register/pending")
+      return
     } catch (err: any) {
       setErrors({ submit: err.message ?? "登録に失敗しました。もう一度お試しください。" })
     } finally {
@@ -224,6 +241,24 @@ export default function CompanyRegisterPage() {
       setErrors((prev) => ({ ...prev, [field]: "" }))
     }
   }
+
+  // 郵便番号APIから住所を自動入力
+  const handlePostalCodeBlur = async () => {
+    const zip = formData.postalCode.replace('-', '');
+    if (!/^\d{7}$/.test(zip)) return;
+    try {
+      const res = await fetch(`https://zipcloud.ibsnet.co.jp/api/search?zipcode=${zip}`);
+      const data = await res.json();
+      if (data.results && data.results.length > 0) {
+        const result = data.results[0];
+        updateFormData('prefecture', result.address1);
+        updateFormData('city', result.address2);
+        updateFormData('address', result.address3);
+      }
+    } catch (error) {
+      console.error('郵便番号APIエラー', error);
+    }
+  };
 
   const prefectures = [
     "北海道",
@@ -497,7 +532,7 @@ export default function CompanyRegisterPage() {
                 </div>
 
                 <div>
-                  <Label htmlFor="website">ウェブサイト *</Label>
+                  <Label htmlFor="website">ウェブサイト</Label>
                   <Input
                     id="website"
                     type="url"
@@ -532,6 +567,7 @@ export default function CompanyRegisterPage() {
                     id="postalCode"
                     value={formData.postalCode}
                     onChange={(e) => updateFormData("postalCode", e.target.value)}
+                    onBlur={handlePostalCodeBlur}
                     placeholder="例: 123-4567"
                     className={errors.postalCode ? "border-red-500" : ""}
                   />
@@ -594,36 +630,6 @@ export default function CompanyRegisterPage() {
             {/* ステップ4: 権限・同意 */}
             {step === 4 && (
               <>
-                <div>
-                  <Label htmlFor="role">権限ロール *</Label>
-                  <Select value={formData.role} onValueChange={(value) => updateFormData("role", value)}>
-                    <SelectTrigger className={errors.role ? "border-red-500" : ""}>
-                      <SelectValue placeholder="権限ロールを選択してください" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="main_admin">
-                        <div className="flex items-center">
-                          <Shield className="h-4 w-4 mr-2 text-blue-600" />
-                          <div>
-                            <div className="font-medium">メイン管理者</div>
-                            <div className="text-sm text-gray-500">全ての機能にアクセス可能</div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="co_editor">
-                        <div className="flex items-center">
-                          <Users className="h-4 w-4 mr-2 text-green-600" />
-                          <div>
-                            <div className="font-medium">共同編集者</div>
-                            <div className="text-sm text-gray-500">求人作成・応募者管理が可能</div>
-                          </div>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.role && <p className="text-red-500 text-sm mt-1">{errors.role}</p>}
-                </div>
-
                 <div className="space-y-4">
                   <div className="flex items-start space-x-3">
                     <Checkbox

@@ -58,15 +58,22 @@ export default function CompanyLoginPage() {
           throw new Error(authErr?.message || "メールアドレスまたはパスワードが正しくありません。")
         }
 
-        // ユーザーに紐づく企業IDを companies テーブルから取得
+        // ユーザーに紐づく企業IDと承認状況を companies テーブルから取得
         const { data: company, error: compErr } = await supabase
           .from("companies")
-          .select("id")
+          .select("id, is_approved")
           .eq("user_id", user.id)
           .single();
 
         if (compErr || !company) {
           throw new Error("このアカウントに紐づく企業が見つかりません。");
+        }
+
+        // 承認状況のチェック
+        if (!company.is_approved) {
+          router.push("/auth/company/register/pending");
+          setIsLoading(false);
+          return;
         }
 
         toast({

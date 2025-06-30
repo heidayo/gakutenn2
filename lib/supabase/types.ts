@@ -179,6 +179,7 @@ export type Database = {
           email: string
           id: string
           industry: string | null
+          is_approved: boolean
           logo_url: string | null
           name: string
           phone: string | null
@@ -194,6 +195,7 @@ export type Database = {
           email: string
           id?: string
           industry?: string | null
+          is_approved?: boolean
           logo_url?: string | null
           name: string
           phone?: string | null
@@ -209,9 +211,64 @@ export type Database = {
           email?: string
           id?: string
           industry?: string | null
+          is_approved?: boolean
           logo_url?: string | null
           name?: string
           phone?: string | null
+          size?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          website?: string | null
+        }
+        Relationships: []
+      }
+      company_profiles: {
+        Row: {
+          address: string | null
+          company_id: string
+          created_at: string | null
+          description: string | null
+          email: string
+          id: string
+          industry: string | null
+          logo_url: string | null
+          name: string
+          phone: string | null
+          postal_code: string | null
+          size: string | null
+          updated_at: string | null
+          user_id: string | null
+          website: string | null
+        }
+        Insert: {
+          address?: string | null
+          company_id: string
+          created_at?: string | null
+          description?: string | null
+          email?: string
+          id?: string
+          industry?: string | null
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          postal_code?: string | null
+          size?: string | null
+          updated_at?: string | null
+          user_id?: string | null
+          website?: string | null
+        }
+        Update: {
+          address?: string | null
+          company_id?: string
+          created_at?: string | null
+          description?: string | null
+          email?: string
+          id?: string
+          industry?: string | null
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          postal_code?: string | null
           size?: string | null
           updated_at?: string | null
           user_id?: string | null
@@ -361,6 +418,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "jobs"
             referencedColumns: ["id", "company_id"]
+          },
+          {
+            foreignKeyName: "fk_interviews_profiles"
+            columns: ["applicant_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["user_id"]
           },
           {
             foreignKeyName: "interviews_company_id_fkey"

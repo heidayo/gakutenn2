@@ -49,13 +49,13 @@ export default function CompanyManagement() {
               (async () => {
                 const { error } = await supabase
                   .from("companies")
-                  .update({ status: "approved", updated_at: new Date().toISOString() })
+                  .update({ is_approved: true, updated_at: new Date().toISOString() })
                   .eq("id", companyId)
                 if (error) {
-                  console.error("Error updating company status to approved:", error)
+                  console.error("Error updating company is_approved to true:", error)
                 }
               })()
-              return { ...company, status: "approved" }
+              return { ...company, is_approved: true }
             case "suspend":
               (async () => {
                 const { error } = await supabase
@@ -233,7 +233,11 @@ export default function CompanyManagement() {
                         <div>応募: {company.applications}件</div>
                         <div className="text-xs text-gray-500">最終ログイン: {company.lastLogin}</div>
                       </div>
-                      <Badge className={getStatusColor(company.status)}>{getStatusText(company.status)}</Badge>
+                      <Badge
+                        className={company.is_approved ? getStatusColor("approved") : getStatusColor("pending")}
+                      >
+                        {company.is_approved ? "承認済み" : "承認待ち"}
+                      </Badge>
                       <div className="flex items-center space-x-1">
                         <Button
                           variant="ghost"
@@ -242,12 +246,16 @@ export default function CompanyManagement() {
                           disabled={isLoading}
                         >
                         </Button>
-                        {company.status === "pending" && (
+                        {!company.is_approved && (
                           <Button
                             variant="ghost"
                             size="sm"
                             className="text-green-600"
-                            onClick={() => handleCompanyAction(company.id, "approve")}
+                            onClick={() => {
+                              if (window.confirm("この企業を承認してもよろしいですか？")) {
+                                handleCompanyAction(company.id, "approve")
+                              }
+                            }}
                             disabled={isLoading}
                           >
                             <UserCheck className="h-4 w-4" />

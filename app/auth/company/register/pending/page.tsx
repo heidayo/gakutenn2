@@ -41,16 +41,10 @@ export default function CompanyRegisterPendingPage() {
       time: "完了",
     },
     {
-      title: "法人確認",
-      description: "法人番号・登記情報の確認中",
-      status: "in_progress",
-      time: "1-2営業日",
-    },
-    {
       title: "管理者承認",
       description: "キャリプラ管理者による最終確認",
       status: "pending",
-      time: "1営業日",
+      time: "1-3営業日",
     },
     {
       title: "アカウント有効化",
@@ -69,7 +63,7 @@ export default function CompanyRegisterPendingPage() {
             <Clock className="h-8 w-8 text-blue-600" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">企業登録申請完了</h1>
-          <p className="text-gray-600">法人確認・管理者承認をお待ちください</p>
+          <p className="text-gray-600">管理者承認をお待ちください</p>
         </div>
 
         {/* ステータスカード */}
@@ -82,7 +76,6 @@ export default function CompanyRegisterPendingPage() {
                 承認待ち
               </Badge>
             </CardTitle>
-            <CardDescription>申請から{formatTime(timeElapsed)}が経過しています</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
@@ -144,13 +137,6 @@ export default function CompanyRegisterPendingPage() {
               ))}
             </div>
 
-            <div className="mt-6">
-              <div className="flex justify-between text-sm text-gray-600 mb-2">
-                <span>進捗</span>
-                <span>25%</span>
-              </div>
-              <Progress value={25} className="h-2" />
-            </div>
           </CardContent>
         </Card>
 
@@ -167,14 +153,6 @@ export default function CompanyRegisterPendingPage() {
               <h4 className="font-medium text-blue-900 mb-2">メール通知について</h4>
               <p className="text-sm text-blue-700">
                 承認完了時に登録いただいたメールアドレスに通知をお送りします。 迷惑メールフォルダもご確認ください。
-              </p>
-            </div>
-
-            <div className="bg-amber-50 p-4 rounded-lg">
-              <h4 className="font-medium text-amber-900 mb-2">法人確認について</h4>
-              <p className="text-sm text-amber-700">
-                法人番号や登記情報に不備がある場合、追加の書類提出をお願いする場合があります。
-                その際は担当者よりご連絡いたします。
               </p>
             </div>
 
@@ -234,14 +212,6 @@ export default function CompanyRegisterPendingPage() {
               ログインページへ
             </Link>
           </Button>
-        </div>
-
-        {/* 申請ID */}
-        <div className="text-center mt-8 p-4 bg-gray-50 rounded-lg">
-          <p className="text-sm text-gray-600">
-            申請ID: <span className="font-mono font-medium">CMP-{Date.now().toString().slice(-8)}</span>
-          </p>
-          <p className="text-xs text-gray-500 mt-1">お問い合わせの際は、この申請IDをお伝えください</p>
         </div>
       </div>
     </div>
