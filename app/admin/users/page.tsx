@@ -1,70 +1,102 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, MoreHorizontal, UserCheck, Mail, Calendar, GraduationCap, Eye, Ban, Users } from "lucide-react"
+import { Search, MoreHorizontal, UserCheck, Mail, Calendar, GraduationCap, Eye, Ban, Users, X } from "lucide-react"
+import { supabase } from "@/lib/supabase/client";
 
 export default function UserManagement() {
   const [searchTerm, setSearchTerm] = useState("")
   const [studentFilter, setStudentFilter] = useState("all")
-  const [selectedUsers, setSelectedUsers] = useState<number[]>([])
+  const [selectedUsers, setSelectedUsers] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(false)
+
+  const fetchStats = async () => {
+    try {
+      // 全学生数を取得
+      const { count: total, error: totalError } = await supabase
+        .from("students")
+        .select("id", { count: "exact", head: true });
+      if (totalError) throw totalError;
+
+      // アクティブユーザー数を取得
+      const { count: active, error: activeError } = await supabase
+        .from("students")
+        .select("id", { count: "exact", head: true })
+        .eq("status", "active");
+      if (activeError) throw activeError;
+
+      setUserStats({
+        totalStudents: total ?? 0,
+        activeUsers: active ?? 0,
+      });
+    } catch (error) {
+      console.error("Error fetching user stats:", error);
+    }
+  };
+
+  useEffect(() => {
+    fetchStats();
+    fetchStudents();
+  }, []);
+
+  const fetchStudents = async () => {
+    setIsLoading(true);
+    const { data, error } = await supabase
+      .from("students")
+      .select("id, name, email, phone, university, major, year, location, avatar_url, status, created_at, updated_at, user_id, first_name, last_name, full_name, faculty");
+    if (error) {
+      console.error("Error fetching students:", error);
+    } else {
+      // Fetch application counts for each student and also count hired applications
+      const studentsWithCounts = await Promise.all(
+        data.map(async (student) => {
+          const { count, error: countError } = await supabase
+            .from("applications")
+            .select("id", { count: "exact" })
+            .eq("profile_id", student.id);
+          if (countError) {
+            console.error("Error counting applications:", countError);
+          }
+          // Fetch hired applications count
+          const { count: hiredCount, error: hiredError } = await supabase
+            .from("applications")
+            .select("id", { count: "exact" })
+            .eq("profile_id", student.id)
+            .eq("status", "採用");
+          if (hiredError) {
+            console.error("Error counting hired applications:", hiredError);
+          }
+          return {
+            ...student,
+            applications: count ?? 0,
+            hiredCount: hiredCount ?? 0,
+          };
+        })
+      );
+      setStudents(studentsWithCounts);
+    }
+    setIsLoading(false);
+  };
 
   // ユーザー統計
   const [userStats, setUserStats] = useState({
-    totalStudents: 2847,
-    activeUsers: 1892,
+    totalStudents: 0,
+    activeUsers: 0,
   })
 
   // 学生ユーザー一覧
-  const [students, setStudents] = useState([
-    {
-      id: 1,
-      name: "田中 太郎",
-      email: "tanaka@example.com",
-      university: "東京大学",
-      faculty: "工学部",
-      year: 3,
-      registeredDate: "2024-05-15",
-      lastLogin: "2024-06-01",
-      status: "active",
-      applications: 5,
-      interviews: 2,
-    },
-    {
-      id: 2,
-      name: "佐藤 花子",
-      email: "sato@example.com",
-      university: "早稲田大学",
-      faculty: "商学部",
-      year: 2,
-      registeredDate: "2024-05-20",
-      lastLogin: "2024-06-02",
-      status: "active",
-      applications: 3,
-      interviews: 1,
-    },
-    {
-      id: 3,
-      name: "山田 次郎",
-      email: "yamada@example.com",
-      university: "慶應義塾大学",
-      faculty: "理工学部",
-      year: 4,
-      registeredDate: "2024-04-10",
-      lastLogin: "2024-05-28",
-      status: "suspended",
-      applications: 8,
-      interviews: 4,
-    },
-  ])
+  const [students, setStudents] = useState<any[]>([]);
+  const [selectedStudent, setSelectedStudent] = useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // 学生ユーザー操作
-  const handleStudentAction = async (studentId: number, action: string) => {
+  const handleStudentAction = async (studentId: string, action: string) => {
     setIsLoading(true)
     await new Promise((resolve) => setTimeout(resolve, 500))
 
@@ -85,6 +117,16 @@ export default function UserManagement() {
         return student
       }),
     )
+
+    const newStatus = action === "suspend" ? "suspended" : action === "activate" ? "active" : null;
+    if (newStatus) {
+      const { error: updateError } = await supabase
+        .from("students")
+        .update({ status: newStatus })
+        .eq("id", studentId);
+      if (updateError) console.error("Error updating status:", updateError);
+    }
+
     setIsLoading(false)
   }
 
@@ -230,7 +272,7 @@ export default function UserManagement() {
                     <div className="flex items-center space-x-4">
                       <div className="text-right text-sm">
                         <div>応募: {student.applications}件</div>
-                        <div>面談: {student.interviews}件</div>
+                        <div>採用: {student.hiredCount}件</div>
                         <div className="text-xs text-gray-500">最終ログイン: {student.lastLogin}</div>
                       </div>
                       <Badge className={getStatusColor(student.status)}>{getStatusText(student.status)}</Badge>
@@ -238,7 +280,10 @@ export default function UserManagement() {
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleStudentAction(student.id, "view")}
+                          onClick={() => {
+                            setSelectedStudent(student);
+                            setIsModalOpen(true);
+                          }}
                           disabled={isLoading}
                         >
                           <Eye className="h-4 w-4" />
@@ -272,6 +317,49 @@ export default function UserManagement() {
           </CardContent>
         </Card>
       </div>
+      {isModalOpen && selectedStudent && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="relative bg-white rounded-lg p-6 max-w-2xl w-full mx-4 max-h-[80vh] overflow-y-auto">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="absolute top-6 right-4 h-9 w-9 flex items-center justify-center"
+              onClick={() => setIsModalOpen(false)}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center justify-between mb-4 pr-12">
+              <h3 className="text-xl font-bold">{selectedStudent.name} さんの詳細</h3>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    // Save the selected student's ID to sessionStorage
+                    sessionStorage.setItem("currentStudentId", selectedStudent.id);
+                    // Open the applications page
+                    window.open("/student/applications", "_blank");
+                  }}
+                >
+                  応募状況を見る
+                </Button>
+              </div>
+            </div>
+            <div className="space-y-2 text-sm">
+              <div><strong>名前:</strong> {selectedStudent.full_name || selectedStudent.name}</div>
+              <div><strong>メール:</strong> {selectedStudent.email}</div>
+              <div><strong>電話:</strong> {selectedStudent.phone || "ー"}</div>
+              <div><strong>大学:</strong> {selectedStudent.university}</div>
+              <div><strong>学部・学科:</strong> {selectedStudent.faculty || selectedStudent.major}</div>
+              <div><strong>学年:</strong> {selectedStudent.year} 年</div>
+              <div><strong>所在地:</strong> {selectedStudent.location || "ー"}</div>
+              <div><strong>ステータス:</strong> {getStatusText(selectedStudent.status)}</div>
+              <div><strong>登録日:</strong> {new Date(selectedStudent.created_at).toLocaleDateString()}</div>
+              <div><strong>更新日:</strong> {new Date(selectedStudent.updated_at).toLocaleDateString()}</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

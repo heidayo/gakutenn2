@@ -1,12 +1,14 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Search, MoreHorizontal, UserCheck, Mail, Calendar, Building2, Eye, Ban } from "lucide-react"
+import { Search, MoreHorizontal, UserCheck, Mail, Calendar, Building2, Eye, Ban, X } from "lucide-react"
+
+import { supabase } from "@/lib/supabase/client"
 
 export default function CompanyManagement() {
   const [searchTerm, setSearchTerm] = useState("")
@@ -18,56 +20,24 @@ export default function CompanyManagement() {
   const [selectedCompany, setSelectedCompany] = useState<any>(null)
 
   // 企業ユーザー一覧
-  const [companies, setCompanies] = useState([
-    {
-      id: 1,
-      name: "株式会社テックスタート",
-      email: "hr@techstart.com",
-      industry: "IT・ソフトウェア",
-      size: "51-100名",
-      registeredDate: "2024-04-01",
-      lastLogin: "2024-06-02",
-      status: "approved",
-      jobsPosted: 12,
-      applications: 156,
-      jobTypes: ["engineer", "design"],
-      locations: ["tokyo", "remote"],
-      weekendWork: "weekends",
-    },
-    {
-      id: 2,
-      name: "株式会社イノベーション",
-      email: "recruit@innovation.com",
-      industry: "コンサルティング",
-      size: "101-500名",
-      registeredDate: "2024-05-10",
-      lastLogin: "2024-06-01",
-      status: "pending",
-      jobsPosted: 0,
-      applications: 0,
-      jobTypes: ["sales", "marketing"],
-      locations: ["tokyo", "osaka"],
-      weekendWork: "weekdays",
-    },
-    {
-      id: 3,
-      name: "株式会社フューチャー",
-      email: "contact@future.com",
-      industry: "金融",
-      size: "501-1000名",
-      registeredDate: "2024-03-15",
-      lastLogin: "2024-05-30",
-      status: "approved",
-      jobsPosted: 8,
-      applications: 89,
-      jobTypes: ["engineer", "hr"],
-      locations: ["tokyo", "nagoya"],
-      weekendWork: "weekdays",
-    },
-  ])
+  const [companies, setCompanies] = useState<any[]>([])
+
+  useEffect(() => {
+    const fetchCompanies = async () => {
+      const { data, error } = await supabase
+        .from("companies")
+        .select("*")
+      if (error) {
+        console.error("Error fetching companies:", error)
+      } else {
+        setCompanies(data)
+      }
+    }
+    fetchCompanies()
+  }, [])
 
   // 企業ユーザー操作
-  const handleCompanyAction = async (companyId: number, action: string) => {
+  const handleCompanyAction = async (companyId: string, action: string) => {
     setIsLoading(true)
     await new Promise((resolve) => setTimeout(resolve, 500))
 
@@ -76,11 +46,28 @@ export default function CompanyManagement() {
         if (company.id === companyId) {
           switch (action) {
             case "approve":
+              (async () => {
+                const { error } = await supabase
+                  .from("companies")
+                  .update({ status: "approved", updated_at: new Date().toISOString() })
+                  .eq("id", companyId)
+                if (error) {
+                  console.error("Error updating company status to approved:", error)
+                }
+              })()
               return { ...company, status: "approved" }
             case "suspend":
+              (async () => {
+                const { error } = await supabase
+                  .from("companies")
+                  .update({ status: "suspended", updated_at: new Date().toISOString() })
+                  .eq("id", companyId)
+                if (error) {
+                  console.error("Error updating company status to suspended:", error)
+                }
+              })()
               return { ...company, status: "suspended" }
             case "view":
-              alert(`${company.name}の詳細を表示します`)
               break
           }
         }
@@ -189,14 +176,6 @@ export default function CompanyManagement() {
                   </SelectContent>
                 </Select>
                 <Select value={weekendFilter} onValueChange={setWeekendFilter}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue placeholder="土日可否" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">すべて</SelectItem>
-                    <SelectItem value="weekdays">平日のみ</SelectItem>
-                    <SelectItem value="weekends">土日可</SelectItem>
-                  </SelectContent>
                 </Select>
                 <Select value={companyFilter} onValueChange={setCompanyFilter}>
                   <SelectTrigger className="w-32">
@@ -227,7 +206,7 @@ export default function CompanyManagement() {
                       <div>
                         <h4 className="font-semibold">{company.name}</h4>
                         <p className="text-sm text-gray-600">
-                          {company.industry} • {company.size}
+                          {company.industry} 
                         </p>
                         <div className="flex items-center space-x-4 mt-1 text-xs text-gray-500">
                           <div className="flex items-center space-x-1">
@@ -236,7 +215,14 @@ export default function CompanyManagement() {
                           </div>
                           <div className="flex items-center space-x-1">
                             <Calendar className="h-3 w-3" />
-                            <span>登録: {company.registeredDate}</span>
+                            <span>
+                              登録:{" "}
+                              {new Date(company.created_at).toLocaleDateString("ja-JP", {
+                                year: "numeric",
+                                month: "2-digit",
+                                day: "2-digit",
+                              })}
+                            </span>
                           </div>
                         </div>
                       </div>
@@ -255,7 +241,6 @@ export default function CompanyManagement() {
                           onClick={() => handleCompanyAction(company.id, "view")}
                           disabled={isLoading}
                         >
-                          <Eye className="h-4 w-4" />
                         </Button>
                         {company.status === "pending" && (
                           <Button
@@ -298,13 +283,14 @@ export default function CompanyManagement() {
                       <div className="flex items-center space-x-2">
                         <Button
                           variant="outline"
-                          size="sm"
-                          onClick={() => window.open(`/admin/jobs?company=${selectedCompany.id}`, "_blank")}
+                          size="lg"
+                          className="px-4 py-2 text-sm font-medium"
+                          onClick={() => window.open(`/company/${selectedCompany.id}/jobs`, "_blank")}
                         >
                           求人一覧を見る
                         </Button>
                         <Button variant="ghost" size="sm" onClick={() => setSelectedCompany(null)}>
-                          ✕
+                          <X className="h-5 w-5" />
                         </Button>
                       </div>
                     </div>
@@ -315,87 +301,61 @@ export default function CompanyManagement() {
                           <p className="text-sm">{selectedCompany.industry}</p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-600">従業員数</label>
-                          <p className="text-sm">{selectedCompany.size}</p>
-                        </div>
-                        <div>
                           <label className="text-sm font-medium text-gray-600">メールアドレス</label>
                           <p className="text-sm">{selectedCompany.email}</p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-600">登録日</label>
-                          <p className="text-sm">{selectedCompany.registeredDate}</p>
+                          <label className="text-sm font-medium text-gray-600">電話番号</label>
+                          <p className="text-sm">{selectedCompany.phone || "—"}</p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-600">最終ログイン</label>
-                          <p className="text-sm">{selectedCompany.lastLogin}</p>
+                          <label className="text-sm font-medium text-gray-600">住所</label>
+                          <p className="text-sm">
+                            {selectedCompany.address
+                              ? selectedCompany.address.replace(/〒?\d{3}-\d{4}\s*/, "")
+                              : "—"}
+                          </p>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-600">ステータス</label>
-                          <Badge className={getStatusColor(selectedCompany.status)}>
-                            {getStatusText(selectedCompany.status)}
-                          </Badge>
-                        </div>
-                      </div>
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <label className="text-sm font-medium text-gray-600">投稿求人数</label>
-                          <button
-                            className="text-sm text-blue-600 hover:underline cursor-pointer"
-                            onClick={() => window.open(`/admin/jobs?company=${selectedCompany.id}`, "_blank")}
+                          <label className="text-sm font-medium text-gray-600">ウェブサイト</label>
+                          <a
+                            href={selectedCompany.website || "#"}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 hover:underline"
                           >
-                            {selectedCompany.jobsPosted}件
-                          </button>
+                            {selectedCompany.website || "—"}
+                          </a>
                         </div>
                         <div>
-                          <label className="text-sm font-medium text-gray-600">受信応募数</label>
-                          <p className="text-sm">{selectedCompany.applications}件</p>
+                          <label className="text-sm font-medium text-gray-600">登録日</label>
+                          <p className="text-sm">
+                            {new Date(selectedCompany.created_at).toLocaleDateString("ja-JP", {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                            })}
+                          </p>
+                        </div>
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">更新日</label>
+                          <p className="text-sm">
+                            {new Date(selectedCompany.updated_at).toLocaleDateString("ja-JP", {
+                              year: "numeric",
+                              month: "2-digit",
+                              day: "2-digit",
+                            })}
+                          </p>
                         </div>
                       </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">募集職種</label>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {selectedCompany.jobTypes.map((type: string) => (
-                            <Badge key={type} variant="outline">
-                              {type === "engineer"
-                                ? "エンジニア"
-                                : type === "sales"
-                                  ? "営業"
-                                  : type === "marketing"
-                                    ? "マーケティング"
-                                    : type === "design"
-                                      ? "デザイン"
-                                      : type === "hr"
-                                        ? "人事"
-                                        : type}
-                            </Badge>
-                          ))}
+                      {selectedCompany.description && (
+                        <div>
+                          <label className="text-sm font-medium text-gray-600">会社説明</label>
+                          <p className="text-sm whitespace-pre-wrap">
+                            {selectedCompany.description}
+                          </p>
                         </div>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">勤務地</label>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                          {selectedCompany.locations.map((location: string) => (
-                            <Badge key={location} variant="outline">
-                              {location === "tokyo"
-                                ? "東京"
-                                : location === "osaka"
-                                  ? "大阪"
-                                  : location === "nagoya"
-                                    ? "名古屋"
-                                    : location === "fukuoka"
-                                      ? "福岡"
-                                      : location === "remote"
-                                        ? "リモート"
-                                        : location}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-sm font-medium text-gray-600">土日勤務</label>
-                        <p className="text-sm">{selectedCompany.weekendWork === "weekdays" ? "平日のみ" : "土日可"}</p>
-                      </div>
+                      )}
                     </div>
                   </div>
                 </div>
