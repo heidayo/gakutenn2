@@ -61,7 +61,7 @@ export default function CompanyLoginPage() {
         // ユーザーに紐づく企業IDと承認状況を companies テーブルから取得
         const { data: company, error: compErr } = await supabase
           .from("companies")
-          .select("id, is_approved")
+          .select("id, is_approved, has_logged_in")
           .eq("user_id", user.id)
           .single();
 

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -22,11 +23,27 @@ import { useRouter } from "next/navigation"
 export default function CompanyRegisterCompletePage() {
   const router = useRouter()
   const [showConfetti, setShowConfetti] = useState(true)
+  const [companyId, setCompanyId] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setTimeout(() => setShowConfetti(false), 3000)
     return () => clearTimeout(timer)
   }, [])
+
+  useEffect(() => {
+    (async () => {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) return;
+      const { data, error: fetchError } = await supabase
+        .from("companies")
+        .select("id")
+        .eq("user_id", user.id)
+        .single();
+      if (!fetchError && data) {
+        setCompanyId(data.id);
+      }
+    })();
+  }, []);
 
   const setupTasks = [
     {
@@ -42,13 +59,6 @@ export default function CompanyRegisterCompletePage() {
       priority: "high",
       time: "15分",
       icon: Briefcase,
-    },
-    {
-      title: "チームメンバー招待",
-      description: "採用担当者を招待して効率的な運用",
-      priority: "medium",
-      time: "5分",
-      icon: Users,
     },
   ]
 
@@ -98,8 +108,8 @@ export default function CompanyRegisterCompletePage() {
           <div className="inline-flex items-center justify-center w-20 h-20 bg-green-100 rounded-full mb-4">
             <CheckCircle className="h-10 w-10 text-green-600" />
           </div>
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">🎉 企業登録完了！</h1>
-          <p className="text-xl text-gray-600 mb-4">キャリプラへようこそ！優秀な学生との出会いを始めましょう</p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2"> 企業登録完了！</h1>
+          <p className="text-xl text-gray-600 mb-4">学転インターンへようこそ！優秀な学生との出会いを始めましょう</p>
           <Badge className="bg-green-100 text-green-800 px-4 py-2">アカウント有効化済み</Badge>
         </div>
 
@@ -141,7 +151,15 @@ export default function CompanyRegisterCompletePage() {
                   </div>
                   <div className="text-right">
                     <p className="text-sm text-gray-500">{task.time}</p>
-                    <Button size="sm" variant="outline">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (companyId) {
+                          router.push(`/company/${companyId}/notifications`);
+                        }
+                      }}
+                    >
                       開始
                     </Button>
                   </div>
@@ -162,7 +180,7 @@ export default function CompanyRegisterCompletePage() {
         {/* 機能紹介 */}
         <Card className="shadow-lg mb-8">
           <CardHeader>
-            <CardTitle>キャリプラの主要機能</CardTitle>
+            <CardTitle>学転インターンの主要機能</CardTitle>
             <CardDescription>効率的な採用活動をサポートする機能をご紹介します</CardDescription>
           </CardHeader>
           <CardContent>
@@ -235,9 +253,9 @@ export default function CompanyRegisterCompletePage() {
 
         {/* ウェルカムメッセージ */}
         <div className="text-center mt-8 p-6 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg text-white">
-          <h3 className="text-xl font-bold mb-2">キャリプラチームより</h3>
+          <h3 className="text-xl font-bold mb-2">学転インターンチームより</h3>
           <p className="text-blue-100">
-            この度はキャリプラにご登録いただき、ありがとうございます。
+            この度は学転インターンにご登録いただき、ありがとうございます。
             <br />
             優秀な学生との素晴らしい出会いをサポートできることを楽しみにしています！
           </p>

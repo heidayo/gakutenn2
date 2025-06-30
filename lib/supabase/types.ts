@@ -177,6 +177,7 @@ export type Database = {
           created_at: string | null
           description: string | null
           email: string
+          has_logged_in: boolean
           id: string
           industry: string | null
           is_approved: boolean
@@ -193,6 +194,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           email: string
+          has_logged_in?: boolean
           id?: string
           industry?: string | null
           is_approved?: boolean
@@ -209,6 +211,7 @@ export type Database = {
           created_at?: string | null
           description?: string | null
           email?: string
+          has_logged_in?: boolean
           id?: string
           industry?: string | null
           is_approved?: boolean

@@ -134,13 +134,36 @@ export default function NotificationsPage() {
   useEffect(() => {
     if (!companyId) return
     const fetchCompany = async () => {
+      // Try to fetch from company_profiles first
       const { data, error } = await supabase
         .from("company_profiles")
         .select("name, address, postal_code, email, phone, industry, description")
         .eq("company_id", companyId)
         .single()
       if (error) {
-        console.error("会社情報取得エラー:", error)
+        // If not found in company_profiles, fallback to companies table
+        // (Assume error.code is "PGRST116" or similar for not found, but fallback anyway)
+        const { data: companyData, error: companyError } = await supabase
+          .from("companies")
+          .select("name, address, email, phone, industry, description")
+          .eq("id", companyId)
+          .single()
+        if (companyError) {
+          console.error("会社情報取得エラー(companies):", companyError)
+        } else if (companyData) {
+          setCompanyName(companyData.name || "")
+          // Split postal code and address from address field
+          const fullAddress = companyData.address || '';
+          const match = fullAddress.match(/^(\d{3}-\d{4})\s*(.*)$/);
+          const postal = match ? match[1] : '';
+          const addr = match ? match[2] : fullAddress;
+          setCompanyPostalCode(postal);
+          setCompanyAddress(addr);
+          setCompanyEmail(companyData.email || "")
+          setCompanyPhone(companyData.phone || "")
+          setCompanyIndustry(companyData.industry || "")
+          setCompanyDescription(companyData.description || "")
+        }
       } else if (data) {
         setCompanyName(data.name)
         setCompanyPostalCode(data.postal_code || "")
@@ -191,9 +214,24 @@ export default function NotificationsPage() {
     if (error) {
       console.error("プロフィール保存エラー:", error)
       alert("プロフィールの保存に失敗しました")
-    } else {
-      alert("プロフィールを保存しました")
+      return;
     }
+    // Also update companies table
+    const compPayload = {
+      name: companyName,
+      address: `${companyPostalCode} ${companyAddress}`,
+      email: companyEmail,
+      phone: companyPhone,
+      industry: companyIndustry,
+      description: companyDescription,
+    };
+    const { error: compError } = await supabase.from('companies').update(compPayload).eq('id', companyId);
+    if (compError) {
+      console.error("企業基本情報保存エラー（companies）:", compError);
+      alert("会社の基本情報の保存に失敗しました");
+      return;
+    }
+    alert("プロフィールを保存しました")
   }
 
   const handleEmailToggle = (key: string, value: boolean) => {
