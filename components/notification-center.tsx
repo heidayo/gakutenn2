@@ -57,6 +57,9 @@ export function NotificationCenter() {
         } else if (row.resource === "interview") {
           // interview (面談予定) uses singular without ID
           defaultLink = `/${userRole}/interviews`;
+        } else if (row.resource === "message") {
+          //message(メッセージ通知)
+          defaultLink = `/${userRole}/messages`;
         } else {
           // others use plural with ID
           defaultLink = `/${userRole}/${row.resource}s/${row.resource_id}`;
@@ -100,15 +103,31 @@ export function NotificationCenter() {
 
   // すべての通知を既読にする関数
   const markAllAsRead = async () => {
+    // 未読の通知IDリストを収集
     const unreadIds = notifications.filter(n => !n.isRead).map(n => n.id);
-    if (unreadIds.length) {
-      const { error } = await supabase
-        .from("notifications")
+    console.log('markAllAsRead unreadIds:', unreadIds);
+    if (unreadIds.length === 0) return;
+
+    // IDリストを一件ずつ既読更新
+    let updatedRows: any[] = [];
+    for (const id of unreadIds) {
+      const { data, error } = await supabase
+        .from('notifications')
         .update({ is_read: true })
-        .in("id", unreadIds);
-      if (error) console.error("Failed to mark all read:", error);
+        .eq('id', id)
+        .select('*');
+      if (error) {
+        console.error('Failed to mark read for id:', id, error);
+        continue;
+      }
+      updatedRows = updatedRows.concat(data ?? []);
     }
-    setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
+    console.log('markAllAsRead updatedRows:', updatedRows);
+
+    // ローカル状態も更新
+    setNotifications(prev =>
+      prev.map(n => unreadIds.includes(n.id) ? { ...n, isRead: true } : n)
+    );
   }
 
   // 通知をフィルタリングする関数

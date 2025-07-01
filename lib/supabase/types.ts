@@ -819,6 +819,7 @@ export type Database = {
           job_title: string | null
           last_message: string | null
           last_message_at: string | null
+          last_message_id: string | null
           room_id: number | null
           status: string | null
           student_id: string | null

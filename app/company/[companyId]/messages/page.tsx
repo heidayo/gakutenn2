@@ -58,6 +58,7 @@ export default function CompanyMessagesPage() {
     job: string
     lastMessage: string
     timestamp: string
+    messageId: number | null
     unreadCount: number
     isRead: boolean
     hasAttachment: boolean
@@ -239,7 +240,7 @@ export default function CompanyMessagesPage() {
       // ---- fetch all messages ----
       const { data: msgRows, error: msgError } = await sb
         .from("messages")
-        .select("application_id, content, created_at, sender, is_read");
+        .select("id, application_id, content, created_at, sender, is_read");
       if (msgError) {
         console.error("メッセージ取得エラー", msgError);
       }
@@ -269,8 +270,9 @@ export default function CompanyMessagesPage() {
           timestamp: lastMsg
             ? new Date(lastMsg.created_at).toLocaleTimeString("ja-JP", { hour: "2-digit", minute: "2-digit" })
             : "",
-          unreadCount: relatedMsgs.filter((m: any) => !m.is_read && m.sender === "student").length,
-          isRead: relatedMsgs.filter((m: any) => !m.is_read && m.sender === "student").length === 0,
+          messageId: lastMsg?.id ?? null,
+          unreadCount: 0, // will fetch below
+          isRead: true,
           hasAttachment: false,
           status: app.status,
           priority: "normal",
@@ -280,16 +282,62 @@ export default function CompanyMessagesPage() {
       });
 
       setChatRooms(enrichedRooms);
+      // Fetch unread notification counts per room
+      const roomsWithUnread = await Promise.all(
+        enrichedRooms.map(async (room: ChatRoom) => {
+          const { count, error: countError } = await sb
+            .from('notifications')
+            .select('*', { count: 'exact', head: false })
+            .eq('company_id', companyId)
+            .eq('resource', 'message')
+            .eq('resource_id', room.messageId?.toString())
+            .eq('is_read', false);
+          if (countError) console.error('通知カウントエラー', countError);
+          return { ...room, unreadCount: count ?? 0, isRead: (count ?? 0) === 0 };
+        })
+      );
+      setChatRooms(roomsWithUnread);
       if (enrichedRooms.length > 0) setSelectedChat(enrichedRooms[0].applicationId);
     }
 
     loadRooms()
   }, [companyId])
 
-  // fetch messages for selected chat
+  // fetch messages for selected chat & mark notifications as read
   useEffect(() => {
+    const markNotificationsRead = async () => {
+      if (selectedChat) {
+        // Mark application notifications as read
+        await supabase
+          .from('notifications')
+          .update({ is_read: true })
+          .eq('company_id', companyId)
+          .eq('resource', 'application')
+          .eq('resource_id', selectedChat);
+
+        // Also mark message notifications as read
+        const room = chatRooms.find(r => r.applicationId === selectedChat);
+        const messageId = room?.messageId?.toString();
+        if (messageId) {
+          await supabase
+            .from('notifications')
+            .update({ is_read: true })
+            .eq('company_id', companyId)
+            .eq('resource', 'message')
+            .eq('resource_id', messageId);
+        }
+        // Optimistically clear badge for this room
+        setChatRooms(prev =>
+          prev.map(r =>
+            r.applicationId === selectedChat ? { ...r, unreadCount: 0, isRead: true } : r
+          )
+        );
+      }
+    };
+
+    markNotificationsRead();
     fetchMessages();
-  }, [selectedChat])
+  }, [selectedChat, companyId, chatRooms]);
 
   const getStatusColor = (status: string) => {
     switch (status) {

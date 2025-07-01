@@ -30,6 +30,7 @@ interface ChatRoom {
   isRead: boolean
   hasAttachment: boolean
   status: string
+  messageId: string
 }
 
 export default function StudentMessagesPage() {
@@ -46,7 +47,7 @@ export default function StudentMessagesPage() {
 
       const { data: rooms, error } = await supabase
         .from("student_chat_rooms_view")
-        .select("room_id, company_name, company_logo, last_message, last_message_at, unread_count, has_attachment, status")
+        .select("room_id, company_name, company_logo, last_message, last_message_at, has_attachment, status, last_message_id")
         .eq("student_id", user.id)
         .order("last_message_at", { ascending: false })
 
@@ -64,13 +65,29 @@ export default function StudentMessagesPage() {
           hour: "2-digit",
           minute: "2-digit",
         }),
-        unreadCount: r.unread_count ?? 0,
-        isRead: (r.unread_count ?? 0) === 0,
+        unreadCount: 0,
+        isRead: true,
         hasAttachment: r.has_attachment,
         status: r.status,
+        messageId: r.last_message_id,
       }))
-      setChatRooms(mapped)
-      if (mapped.length > 0) setSelectedRoomId(mapped[0].id)
+
+      const roomsWithUnread = await Promise.all(
+        mapped.map(async (room) => {
+          const { count, error: countError } = await supabase
+            .from('notifications')
+            .select('*', { count: 'exact', head: false })
+            .eq('student_id', user.id)
+            .eq('resource', 'message')
+            .eq('resource_id', room.messageId)
+            .eq('is_read', false)
+          if (countError) console.error('通知カウントエラー', countError)
+          return { ...room, unreadCount: count ?? 0 }
+        })
+      )
+
+      setChatRooms(roomsWithUnread)
+      if (roomsWithUnread.length > 0) setSelectedRoomId(roomsWithUnread[0].id)
     }
 
     fetchRooms()
@@ -121,7 +138,25 @@ export default function StudentMessagesPage() {
         {chatRooms.map((room) => (
           <Link key={room.id} href={`/student/messages/${room.id}`}>
             <Card
-              onClick={() => setSelectedRoomId(room.id)}
+              onClick={async () => {
+                const { data: { user } } = await supabase.auth.getUser()
+                if (user) {
+                  const { error: updateError } = await supabase
+                    .from('notifications')
+                    .update({ is_read: true })
+                    .eq('student_id', user.id)
+                    .eq('resource', 'message')
+                    .eq('resource_id', room.messageId)
+                  if (updateError) console.error('通知既読エラー', updateError)
+                }
+                // Optimistically clear badge for this room
+                setChatRooms(prev =>
+                  prev.map(r =>
+                    r.id === room.id ? { ...r, unreadCount: 0 } : r
+                  )
+                )
+                setSelectedRoomId(room.id)
+              }}
               className={`mb-2 p-4 hover:bg-gray-50 transition-colors ${
                 selectedRoomId === room.id ? "bg-blue-50" : ""
               }`}
