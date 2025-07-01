@@ -59,7 +59,7 @@ export default function StudentInterviewsPage() {
       notes,
       evaluation,
       company:companies(name),
-      job:jobs(title)
+      job:jobs!interviews_job_id_fkey(title)
     `
       )
     if (error) {

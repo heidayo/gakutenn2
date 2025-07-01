@@ -98,14 +98,21 @@ export default function CompanyMessagesPage() {
       const { data: urlData } = supabase.storage.from("student-chat-uploads").getPublicUrl(filePath);
       const publicUrl = urlData.publicUrl;
 
+      // Find the chat_room.id for the selected application
+      const chatRoom = chatRooms.find(r => r.applicationId === selectedChat);
+      if (!chatRoom) {
+        console.error("Chat room not found for application", selectedChat);
+        return;
+      }
       const { error: insertError } = await supabase
         .from("messages")
-        .insert({
+        .insert([{
           application_id: selectedChat,
+          chat_room_id: Number(chatRoom.id),
           sender: "company",
           content: publicUrl,
           type,
-        });
+        }]);
 
       if (insertError) {
         console.error("message insert error:", insertError);
@@ -154,14 +161,21 @@ export default function CompanyMessagesPage() {
   };
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedChat) return;
+    // Find the chat_room ID for the selected application
+    const chatRoom = chatRooms.find(r => r.applicationId === selectedChat);
+    if (!chatRoom) {
+      console.error("No chat room for application", selectedChat);
+      return;
+    }
     const { error } = await supabase
       .from("messages")
-      .insert({
+      .insert([{
         application_id: selectedChat,
+        chat_room_id: Number(chatRoom.id),
         sender: "company",
         content: newMessage,
         type: "text",
-      });
+      }]);
     if (error) {
       console.error("メッセージ送信エラー", error);
     } else {

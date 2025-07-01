@@ -200,6 +200,7 @@ export default function ChatPage() {
       .from('messages')
       .insert({
         application_id: applicationId,
+        chat_room_id: Number(roomId),
         company_id: companyId,
         content: message.trim(),
         sender: 'student',
@@ -264,6 +265,7 @@ export default function ChatPage() {
         .from("messages")
         .insert({
           application_id: applicationId,
+          chat_room_id: Number(roomId),
           company_id: companyId,
           content: publicUrl,
           sender: "student",

@@ -49,6 +49,23 @@ export function NotificationCenter() {
       // ③ Normalize into Notification[]
       const combined: Notification[] = (rows ?? []).map(row => {
         const pl = (row.payload ?? {}) as { title?: string; message?: string; link?: string };
+        // Determine resource path and default link:
+        let defaultLink: string;
+        if (row.resource === "feedback") {
+          // feedback uses singular with ID
+          defaultLink = `/${userRole}/feedback/${row.resource_id}`;
+        } else if (row.resource === "interview") {
+          // interview (面談予定) uses singular without ID
+          defaultLink = `/${userRole}/interviews`;
+        } else {
+          // others use plural with ID
+          defaultLink = `/${userRole}/${row.resource}s/${row.resource_id}`;
+        }
+        const resolvedLink = pl.link
+          ? pl.link.startsWith("/")
+            ? `/${userRole}${pl.link}`
+            : `/${userRole}/${pl.link}`
+          : defaultLink;
         return {
           id: row.id,
           type: row.resource as NotificationType,
@@ -56,7 +73,7 @@ export function NotificationCenter() {
           message: pl.message ?? "",
           time: new Date(row.created_at).toLocaleString(),
           isRead: row.is_read,
-          link: pl.link ?? `/${row.resource}s/${row.resource_id}`,
+          link: resolvedLink,
         };
       });
 

@@ -129,7 +129,8 @@ export default function CompanyChatPage({ params }: { params: { companyId: strin
         sender: 'company',
         content: message.trim(),
         company_id: params.companyId,
-        application_id: params.id,
+        chat_room_id: Number(params.id),  // Convert string ID to number
+        application_id: params.id,    // Keep if still needed for later
       }])
       .select();
     if (error) {

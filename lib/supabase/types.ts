@@ -555,6 +555,7 @@ export type Database = {
       messages: {
         Row: {
           application_id: string
+          chat_room_id: number
           company_id: string | null
           content: string
           created_at: string
@@ -565,6 +566,7 @@ export type Database = {
         }
         Insert: {
           application_id: string
+          chat_room_id: number
           company_id?: string | null
           content: string
           created_at?: string
@@ -575,6 +577,7 @@ export type Database = {
         }
         Update: {
           application_id?: string
+          chat_room_id?: number
           company_id?: string | null
           content?: string
           created_at?: string
@@ -604,6 +607,20 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "company_chat_rooms_view"
             referencedColumns: ["chat_room_id"]
+          },
+          {
+            foreignKeyName: "messages_chat_room_id_fkey"
+            columns: ["chat_room_id"]
+            isOneToOne: false
+            referencedRelation: "chat_rooms"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_chat_room_id_fkey"
+            columns: ["chat_room_id"]
+            isOneToOne: false
+            referencedRelation: "student_chat_rooms_view"
+            referencedColumns: ["room_id"]
           },
           {
             foreignKeyName: "messages_company_id_fkey"
