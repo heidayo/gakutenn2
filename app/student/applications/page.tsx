@@ -69,9 +69,9 @@ export default async function ApplicationsPage() {
       ? new Date(row.created_at).toLocaleDateString("ja-JP")
       : ""
     const progress =
-      row.status === "合格"
+      row.status === "採用"
         ? 100
-        : row.status === "不合格"
+        : row.status === "不採用"
         ? 100
         : row.status === "面談予定"
         ? 50
@@ -94,8 +94,8 @@ export default async function ApplicationsPage() {
     inProgress: applications.filter((a) =>
       ["面談予定", "書類選考中"].includes(a.status)
     ).length,
-    passed: applications.filter((a) => a.status === "合格").length,
-    rejected: applications.filter((a) => a.status === "不合格").length,
+    passed: applications.filter((a) => a.status === "採用").length,
+    rejected: applications.filter((a) => a.status === "不採用").length,
   }
 
   const getStatusColor = (status: string) => {
@@ -104,9 +104,9 @@ export default async function ApplicationsPage() {
         return "bg-blue-100 text-blue-800"
       case "書類選考中":
         return "bg-yellow-100 text-yellow-800"
-      case "合格":
+      case "採用":
         return "bg-green-100 text-green-800"
-      case "不合格":
+      case "不採用":
         return "bg-red-100 text-red-800"
       default:
         return "bg-gray-100 text-gray-800"
@@ -119,9 +119,9 @@ export default async function ApplicationsPage() {
         return <Clock className="h-4 w-4 text-blue-600" />
       case "書類選考中":
         return <Eye className="h-4 w-4 text-yellow-600" />
-      case "合格":
+      case "採用":
         return <CheckCircle className="h-4 w-4 text-green-600" />
-      case "不合格":
+      case "不採用":
         return <XCircle className="h-4 w-4 text-red-600" />
       default:
         return <AlertCircle className="h-4 w-4 text-gray-600" />
@@ -169,7 +169,7 @@ export default async function ApplicationsPage() {
               <div className="text-2xl font-bold text-green-600">
                 {stats.passed}
               </div>
-              <div className="text-xs text-gray-600">合格</div>
+              <div className="text-xs text-gray-600">採用</div>
             </div>
           </Card>
           <Card className="p-4">
@@ -177,7 +177,7 @@ export default async function ApplicationsPage() {
               <div className="text-2xl font-bold text-red-600">
                 {stats.rejected}
               </div>
-              <div className="text-xs text-gray-600">不合格</div>
+              <div className="text-xs text-gray-600">不採用</div>
             </div>
           </Card>
         </div>

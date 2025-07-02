@@ -33,7 +33,7 @@ export default function StudentDashboardPage() {
   const [ongoingCount, setOngoingCount] = useState<number>(0);
 
   const [upcomingInterviews, setUpcomingInterviews] = useState<any[]>([]);
-  const [recentFeedback, setRecentFeedback] = useState<any[]>([]);
+  const [recentFeedback, setRecentFeedback] = useState<{ company: string; role: string; rating: number; comment: string; date: string; isNew: boolean }[]>([]);
   const [goals, setGoals] = useState<
     { title: string; current: number; target: number; progress: number }[]
   >([]);
@@ -58,21 +58,31 @@ export default function StudentDashboardPage() {
 
       // ── Feedback ────────────────────────────────────────
       const { data: fb } = await supabase
-        .from("feedback")
-        .select("company, role, rating, comment, date")
+        .from("feedbacks")
+        .select(`
+          overall_rating,
+          overall_comment,
+          created_at,
+          company:companies(name),
+          job:jobs(title)
+        `)
         .eq("student_id", userId)
-        .order("date", { ascending: false })
+        .order("created_at", { ascending: false })
         .limit(5);
 
       if (fb) {
         setRecentFeedback(
           fb.map(f => ({
-            ...f,
-            isNew: new Date(f.date) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+            company: f.company.name,
+            role: f.job?.title || "",
+            rating: f.overall_rating,
+            comment: f.overall_comment,
+            date: new Date(f.created_at).toLocaleDateString("ja-JP"),
+            isNew: new Date(f.created_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
           }))
         );
         if (fb.length) {
-          const avg = fb.reduce((s, f) => s + (f.rating || 0), 0) / fb.length;
+          const avg = fb.reduce((s, f) => s + (f.overall_rating || 0), 0) / fb.length;
           setAverageRating(Number(avg.toFixed(1)));
         }
       }
@@ -86,8 +96,8 @@ export default function StudentDashboardPage() {
             start_time,
             end_time,
             type,
-            company:companies(name),
-            job:jobs(title)
+            company:companies!company_id(name),
+            job:jobs!job_id(title)
           `
         )
         .eq("applicant_id", userId)
