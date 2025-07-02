@@ -65,7 +65,6 @@ export function CompanySidebar() {
   const [companyId, setCompanyId] = useState<string>("");
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [unreadApplicationsCount, setUnreadApplicationsCount] = useState<number>(0);
-  const [unreadInterviewsCount, setUnreadInterviewsCount] = useState<number>(0);
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
 
   const pathname = usePathname()
@@ -142,15 +141,6 @@ export function CompanySidebar() {
           .eq('resource', 'application');
         if (!appErr) setUnreadApplicationsCount(appCount ?? 0);
 
-        // 面接管理の未読通知数取得
-        const { count: intCount, error: intErr } = await supabase
-          .from('notifications')
-          .select('*', { count: 'exact', head: true })
-          .eq('company_id', companyRow.id)
-          .eq('is_read', false)
-          .eq('resource', 'interview');
-        if (!intErr) setUnreadInterviewsCount(intCount ?? 0);
-
         // メッセージの未読通知数取得
         const { count: msgCount, error: msgErr } = await supabase
           .from('notifications')
@@ -209,11 +199,6 @@ export function CompanySidebar() {
                         {item.title === '応募者管理' && unreadApplicationsCount > 0 && (
                           <span className="ml-auto inline-flex items-center justify-center h-5 w-5 text-xs font-semibold text-white bg-red-500 rounded-full">
                             {unreadApplicationsCount}
-                          </span>
-                        )}
-                        {item.title === '面接管理' && unreadInterviewsCount > 0 && (
-                          <span className="ml-auto inline-flex items-center justify-center h-5 w-5 text-xs font-semibold text-white bg-red-500 rounded-full">
-                            {unreadInterviewsCount}
                           </span>
                         )}
                         {item.title === 'メッセージ' && unreadMessagesCount > 0 && (

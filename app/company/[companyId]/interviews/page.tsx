@@ -52,8 +52,9 @@ export default function CompanyInterviewsPage() {
   interface Interview {
     id: number
     applicant: string
-    applicantId: number
+    applicantId: string
     job: string
+    jobId: string
     date: string
     time: string
     type: string
@@ -113,6 +114,7 @@ export default function CompanyInterviewsPage() {
           applicant: profile?.full_name ?? "未設定",
           applicantId: row.applicant_id,
           job: row.jobs?.title ?? "",
+          jobId: row.job_id,
           date: new Date(row.date).toLocaleDateString("ja-JP"),
           time:
             row.start_time && row.end_time
@@ -227,6 +229,12 @@ export default function CompanyInterviewsPage() {
 
     return matchesSearch && matchesStatus && matchesType
   })
+  // キャンセルステータスの面談をリストの最後に移動
+  const sortedInterviews = [...filteredInterviews].sort((a, b) => {
+    if (a.status === 'キャンセル' && b.status !== 'キャンセル') return 1;
+    if (a.status !== 'キャンセル' && b.status === 'キャンセル') return -1;
+    return 0;
+  });
 
   // ステータス別統計
   const stats = {
@@ -252,11 +260,25 @@ export default function CompanyInterviewsPage() {
     setIsLoading(false)
   }
 
-  const handleStatusChange = (id: number, newStatus: string) => {
+  const handleStatusChange = async (id: number, newStatus: string) => {
+    // Update status in Supabase
+    const { error } = await supabase
+      .from('interviews')
+      .update({ status: newStatus })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Status update error', error);
+      return;
+    }
+
+    // Reflect change in local state
     setInterviews((prev) =>
-      prev.map((interview) => (interview.id === id ? { ...interview, status: newStatus } : interview)),
-    )
-  }
+      prev.map((interview) =>
+        interview.id === id ? { ...interview, status: newStatus } : interview
+      )
+    );
+  };
 
   const handleBulkAction = (action: string) => {
     console.log(`Bulk action: ${action} for interviews:`, selectedInterviews)
@@ -474,7 +496,7 @@ export default function CompanyInterviewsPage() {
             <Card>
               <CardContent className="p-0">
                 <div className="space-y-0">
-                  {filteredInterviews.map((interview) => (
+                  {sortedInterviews.map((interview) => (
                     <div key={interview.id} className="border-b last:border-b-0 p-4 hover:bg-gray-50">
                       <div className="flex items-start justify-between">
                         <div className="flex items-start space-x-4">
@@ -495,9 +517,6 @@ export default function CompanyInterviewsPage() {
                               <div className="flex items-center space-x-1 text-gray-500">
                                 {getTypeIcon(interview.type)}
                                 <span className="text-sm">{interview.type}</span>
-                              </div>
-                              <div className={`text-sm font-medium ${getPriorityColor(interview.priority)}`}>
-                                優先度: {interview.priority}
                               </div>
                             </div>
                             <p className="text-sm text-gray-600 mb-1">{interview.job}</p>
@@ -556,12 +575,21 @@ export default function CompanyInterviewsPage() {
                           ) : interview.status === "完了" ? (
                             <div className="flex items-center space-x-2">
                               {interview.evaluation && <Badge variant="outline">評価: {interview.evaluation}</Badge>}
-                              <Link href={companyId ? `/company/${companyId}/applications/${interview.applicantId}` : "#"}>
-                                <Button size="sm" variant="outline">
-                                  <Eye className="h-4 w-4 mr-1" />
-                                  詳細
-                                </Button>
-                              </Link>
+                              {(() => {
+                                // find matching application record
+                                const app = applicants.find(a =>
+                                  a.user_id === interview.applicantId && a.job_id === interview.jobId
+                                );
+                                const appId = app ? app.id : "";
+                                return (
+                                  <Link href={appId ? `/company/${companyId}/applications/${appId}` : "#"}>
+                                    <Button size="sm" variant="outline">
+                                      <Eye className="h-4 w-4 mr-1" />
+                                      詳細
+                                    </Button>
+                                  </Link>
+                                );
+                              })()}
                             </div>
                           ) : null}
                           <Button variant="ghost" size="sm">

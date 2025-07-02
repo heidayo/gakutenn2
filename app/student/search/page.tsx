@@ -168,6 +168,7 @@ export default function SearchPage() {
     }
     fetchSavedJobs()
   }, [])
+  
   // 時給レンジ
   const [hourlyRange, setHourlyRange] = useState<[number, number]>([0, 5000])
   const [dailyRange, setdailyRange] = useState<[number, number]>([0, 30000])
