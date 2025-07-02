@@ -25,10 +25,17 @@ import { Progress } from "@/components/ui/progress";
 import { supabase } from "@/lib/supabase/client";
 
 type ProfileRow = {
+  user_id: string;
+  first_name: string | null;
+  last_name: string | null;
   full_name: string | null;
   university: string | null;
-  prefecture: string | null;
+  faculty: string | null;
+  email: string | null;
   phone: string | null;
+  year: string | null;
+  location: string | null;
+  bio: string | null;
   avatar_url: string | null;
 };
 
@@ -59,6 +66,7 @@ const StudentProfileClient: FC<Props> = ({ email: _email }) => {
   const [totalApplications, setTotalApplications] = useState<number>(0);
   const [profileInfo, setProfileInfo] = useState<ProfileRow | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [feedbackRatings, setFeedbackRatings] = useState<number[]>([]);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   // ----- 初回マウント時に Supabase からデータを取得 -----
@@ -79,7 +87,7 @@ const StudentProfileClient: FC<Props> = ({ email: _email }) => {
       // プロフィール取得
       const { data: profData, error: profErr } = await (supabase as any)
         .from("profiles")
-        .select("full_name, university, phone, avatar_url")
+        .select("user_id, first_name, last_name, full_name, university, faculty, email, phone, year, location, bio, avatar_url")
         .eq("user_id", userId)
         .single();
 
@@ -146,9 +154,23 @@ const StudentProfileClient: FC<Props> = ({ email: _email }) => {
         setDiagnosis((diagData ?? []) as Diagnosis[]);
       }
 
+      // フィードバック評価取得
+      const { data: feedbackData, error: feedbackErr } = await (supabase as any)
+        .from("feedbacks")
+        .select("overall_rating")
+        .eq("student_id", userId);
+
+      if (feedbackErr) {
+        console.error("feedback fetch error", feedbackErr);
+      } else {
+        setFeedbackRatings(
+          (feedbackData ?? []).map((f: any) => f.overall_rating)
+        );
+      }
+
       // 応募総数取得
       const { count: appsCount, error: appsErr } = await (supabase as any)
-        .from("student_applications")
+        .from("applications")
         .select("id", { count: "exact", head: true })
         .eq("user_id", userId);
 
@@ -208,9 +230,32 @@ const StudentProfileClient: FC<Props> = ({ email: _email }) => {
 
   // ----- 平均評価を計算 -----
   const averageRating =
-    experiences.length > 0
-      ? experiences.reduce((sum, exp) => sum + exp.rating, 0) / experiences.length
+    feedbackRatings.length > 0
+      ? feedbackRatings.reduce((sum, rating) => sum + rating, 0) / feedbackRatings.length
       : 0;
+
+  // ----- プロフィール完成度計算用フィールド一覧 -----
+  const profileFields = [
+    'first_name',
+    'last_name',
+    'full_name',
+    'university',
+    'faculty',
+    'email',
+    'phone',
+    'year',
+    'location',
+    'bio',
+    'avatar_url'
+  ] as const;
+  // ----- プロフィール完成度を計算 -----
+  const filledCount = profileFields.reduce(
+    (cnt, field) => (profileInfo && (profileInfo as any)[field] ? cnt + 1 : cnt),
+    0
+  );
+  const completionPercent = profileInfo
+    ? Math.floor((filledCount / profileFields.length) * 100)
+    : 0;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
@@ -252,13 +297,6 @@ const StudentProfileClient: FC<Props> = ({ email: _email }) => {
                     </span>
                   </div>
                 )}
-                <Button
-                  size="sm"
-                  className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full p-0 bg-white border-2 border-gray-200"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <Camera className="h-3 w-3 text-gray-600" />
-                </Button>
                 <input
                   type="file"
                   accept="image/*"
@@ -285,9 +323,9 @@ const StudentProfileClient: FC<Props> = ({ email: _email }) => {
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">プロフィール完成度</span>
-                <span className="font-semibold">85%</span>
+                <span className="font-semibold">{completionPercent}%</span>
               </div>
-              <Progress value={85} className="h-2" />
+              <Progress value={completionPercent} className="h-2" />
             </div>
           </CardContent>
         </Card>

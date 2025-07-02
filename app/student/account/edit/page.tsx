@@ -96,11 +96,12 @@ export default function AccountEditPage() {
     }
 
     const fileExt = file.name.split(".").pop()
-    const filePath = `avatar-${user.id}.${fileExt}`
+    const timestamp = Date.now()
+    const filePath = `avatar-${user.id}-${timestamp}.${fileExt}`
 
     const { error: uploadError } = await supabase.storage
       .from("student.profile.picture")
-      .upload(filePath, file, { upsert: true })
+      .upload(filePath, file, { upsert: true, cacheControl: "0" })
 
     if (uploadError) {
       console.error("画像アップロード失敗", uploadError)
@@ -108,7 +109,9 @@ export default function AccountEditPage() {
       return
     }
 
-    const { data } = supabase.storage.from("student.profile.picture").getPublicUrl(filePath)
+    const { data } = supabase.storage
+      .from("student.profile.picture")
+      .getPublicUrl(filePath)
     const publicUrl = data.publicUrl
     setFormData(prev => ({ ...prev, avatarUrl: publicUrl }))
   }
@@ -228,6 +231,7 @@ export default function AccountEditPage() {
                 </div>
                 <div className="text-sm text-gray-600">
                   <p>プロフィール写真を変更</p>
+                  <p className="text-xs mt-1">顔が判別できる写真をお願いいたします</p>
                   <p className="text-xs mt-1">JPG、PNG、GIF形式（最大50MB）</p>
                 </div>
               </div>

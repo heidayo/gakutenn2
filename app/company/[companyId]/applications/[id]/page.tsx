@@ -30,6 +30,7 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
+import Image from 'next/image'
 import { useState } from "react"
 import { supabase } from "@/lib/supabase/client"
 import { useEffect } from "react"
@@ -71,7 +72,7 @@ export default function ApplicantDetailPage() {
       // Fetch profile based on user_id
       const { data: profileData, error: profileError } = await supabase
         .from("profiles")
-        .select("first_name, last_name, full_name, phone, email, location")
+        .select("first_name, last_name, full_name, phone, email, location, avatar_url, bio")
         .eq("user_id", appData.user_id)
         .single();
 
@@ -79,8 +80,32 @@ export default function ApplicantDetailPage() {
         console.error("Error fetching profile:", profileError);
       }
 
-      // Combine and set applicant
-      setApplicant({ ...appData, profiles: profileData });
+      // Fetch job description
+      const { data: jobData, error: jobError } = await supabase
+        .from("jobs")
+        .select("description")
+        .eq("id", appData.job_id)
+        .single();
+      if (jobError) console.error("Error fetching job:", jobError);
+
+      // Fetch company feedback for this application
+      const { data: feedbackData, error: feedbackError } = await supabase
+        .from("feedbacks")
+        .select("overall_comment")
+        .eq("job_id", appData.job_id)
+        .eq("student_id", appData.user_id);
+      if (feedbackError) console.error("Error fetching feedback:", feedbackError);
+
+      // Fetch company name
+      const { data: companyData, error: companyError } = await supabase
+        .from("companies")
+        .select("name")
+        .eq("id", appData.company_id)
+        .single();
+      if (companyError) console.error("Error fetching company:", companyError);
+
+      // Combine and set applicant, including job, feedback, and company
+      setApplicant({ ...appData, profiles: profileData, job: jobData, feedback: feedbackData, company: companyData });
       setLoading(false);
     };
     fetchApplicant();
@@ -185,11 +210,21 @@ export default function ApplicantDetailPage() {
         <div className="w-80 bg-white border-r p-6 space-y-6">
           {/* Profile Header */}
           <div className="text-center">
-            <div className="w-20 h-20 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
-              <span className="text-white text-2xl font-bold">
-                {applicant.name ? applicant.name.split(" ").map((n: string) => n[0]).join("") : ""}
-              </span>
-            </div>
+            {applicant.profiles?.avatar_url ? (
+              <Image
+                src={applicant.profiles.avatar_url}
+                alt={`${applicant.name} のアバター`}
+                width={120}
+                height={120}
+                className="w-32 h-32 rounded-full mx-auto mb-4 object-cover"
+              />
+            ) : (
+              <div className="w-32 h-32 bg-gradient-to-br from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-white text-4xl font-bold">
+                  {applicant.name ? applicant.name.split(" ").map((n: string) => n[0]).join("") : ""}
+                </span>
+              </div>
+            )}
             <h2 className="text-xl font-bold">{applicant.name}</h2>
             <p className="text-sm text-gray-600 mt-1">{applicant.university}</p>
             <div className="flex items-center justify-center space-x-1 mt-2">
@@ -294,10 +329,10 @@ export default function ApplicantDetailPage() {
             <TabsContent value="application" className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>応募内容・自己PR</CardTitle>
+                  <CardTitle>自己紹介</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-sm leading-relaxed text-gray-700">{applicant.additional_info}</p>
+                  <p className="text-sm leading-relaxed text-gray-700">{applicant.profiles?.bio}</p>
                 </CardContent>
               </Card>
               <div className="grid grid-cols-2 gap-6">
@@ -330,51 +365,45 @@ export default function ApplicantDetailPage() {
                   </CardContent>
                 </Card>
               </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>企業への質問、特記事項</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-sm leading-relaxed text-gray-700">{applicant.additional_info}</p>
+                </CardContent>
+              </Card>              
             </TabsContent>
 
             {/* 実務経験 */}
             <TabsContent value="experience" className="space-y-6">
-              {applicant.workExperience?.map((exp: any, index: number) => (
-                <Card key={index}>
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div>
-                        <CardTitle className="text-base">{exp.role}</CardTitle>
-                        <p className="text-sm text-gray-600">{exp.company}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {exp.period} ({exp.duration})
-                        </p>
-                      </div>
-                      <div className="flex items-center space-x-1">
-                        {renderStars(exp.rating)}
-                        <span className="text-sm font-semibold ml-1">{exp.rating}</span>
-                      </div>
+              <Card>
+                <CardHeader>
+                  <CardTitle>実務経験</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">会社名</h4>
+                    <p className="text-sm text-gray-700">{applicant.company?.name}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">業務内容</h4>
+                    <p className="text-sm text-gray-700">{applicant.job?.description}</p>
+                  </div>
+                  <div>
+                    <h4 className="font-semibold text-sm mb-2">企業からのフィードバック</h4>
+                    <div className="bg-blue-50 p-3 rounded-lg">
+                      {applicant.feedback && applicant.feedback.length > 0 ? (
+                        applicant.feedback.map((fb: any, idx: number) => (
+                          <p key={idx} className="text-sm text-gray-700">{fb.overall_comment}</p>
+                        ))
+                      ) : (
+                        <p className="text-sm text-gray-700">フィードバックがありません</p>
+                      )}
                     </div>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <h4 className="font-semibold text-sm mb-2">業務内容</h4>
-                      <p className="text-sm text-gray-700">{exp.description}</p>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm mb-2">企業からのフィードバック</h4>
-                      <div className="bg-blue-50 p-3 rounded-lg">
-                        <p className="text-sm text-gray-700">{exp.feedback}</p>
-                      </div>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm mb-2">習得スキル</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {exp.skills?.map((skill: string, idx: number) => (
-                          <Badge key={idx} variant="secondary">
-                            {skill}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+                  </div>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             {/* スキル */}
