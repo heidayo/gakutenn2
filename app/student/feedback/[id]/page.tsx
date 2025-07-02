@@ -32,6 +32,7 @@ export default function FeedbackDetailPage() {
   const [showResumeDialog, setShowResumeDialog] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [feedback, setFeedback] = useState<any>(null)
+  const [existingLearningNote, setExistingLearningNote] = useState<string | null>(null)
   const params = useParams();
   // Next.js useParams returns string | string[] | undefined, so cast to string
   const id = Array.isArray(params.id) || !params.id ? '' : params.id;
@@ -51,6 +52,21 @@ export default function FeedbackDetailPage() {
     }
     fetchFeedback()
   }, [id])
+  
+  useEffect(() => {
+    if (!id) return
+    const fetchLearningNote = async () => {
+      const { data, error } = await supabase
+        .from('learning_notes')
+        .select('note')
+        .eq('feedback_id', id)
+        .single()
+      if (!error && data) {
+        setExistingLearningNote(data.note)
+      }
+    }
+    fetchLearningNote()
+  }, [id])
 
   if (!feedback) {
     return <div className="p-4">Loading...</div>
@@ -60,10 +76,20 @@ export default function FeedbackDetailPage() {
   const { ratings = {}, comments = {}, overall_rating, overall_comment } = feedback
 
   const handleSaveLearningNote = () => {
-    // 学びメモ保存処理
-    console.log("Saving learning note:", learningNote)
-    setIsSaved(true)
-    setTimeout(() => setIsSaved(false), 2000)
+    const saveNote = async () => {
+      const { error } = await supabase
+        .from('learning_notes')
+        .insert({ feedback_id: id, note: learningNote })
+      if (error) {
+        console.error('Error saving learning note:', error)
+      } else {
+        setExistingLearningNote(learningNote)
+        setLearningNote('')
+        setIsSaved(true)
+        setTimeout(() => setIsSaved(false), 2000)
+      }
+    }
+    saveNote()
   }
 
   const handleAddToResume = () => {
@@ -235,9 +261,9 @@ export default function FeedbackDetailPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {comments.existingLearningNote && (
+            {existingLearningNote && (
               <div className="bg-gray-50 p-3 rounded-lg">
-                <p className="text-sm text-gray-700">{comments.existingLearningNote}</p>
+                <p className="text-sm text-gray-700">{existingLearningNote}</p>
               </div>
             )}
             <div className="space-y-2">
@@ -302,7 +328,7 @@ export default function FeedbackDetailPage() {
                   <strong>評価:</strong> ★{overall_rating}
                 </p>
                 <p>
-                  <strong>学び:</strong> {comments.existingLearningNote || learningNote}
+                  <strong>学び:</strong> {existingLearningNote || learningNote}
                 </p>
               </div>
             </div>

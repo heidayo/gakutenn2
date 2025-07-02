@@ -52,7 +52,7 @@ export default function FeedbackListPage() {
       // ② フィードバック一覧を取得（テーブル名・カラムはスキーマに合わせて調整）
       const { data, error } = await supabase
         .from("feedbacks")
-        .select("*, company:companies(name)")
+        .select("*, company:companies(name), learning_notes(note)")
         .eq("student_id", user.id);
 
       if (error) {
@@ -68,7 +68,8 @@ export default function FeedbackListPage() {
         rating: f.rating,
         date: f.feedback_date,            // 例: "2025-06-01"
         isNew: f.is_new,
-        hasLearningNote: !!f.learning_note,
+        hasLearningNote: Array.isArray(f.learning_notes) && f.learning_notes.length > 0,
+        learningNote: Array.isArray(f.learning_notes) && f.learning_notes.length > 0 ? f.learning_notes[0].note : "",
         preview: f.preview_text,
         category: f.category,
         duration: f.duration_weeks ? `${f.duration_weeks}週間` : "",
@@ -240,6 +241,12 @@ export default function FeedbackListPage() {
                     </div>
 
                     <p className="text-sm text-gray-700 mb-3 line-clamp-2">{feedback.preview}</p>
+
+                    {feedback.hasLearningNote && (
+                      <div className="bg-gray-50 p-3 rounded-lg mb-3">
+                        <p className="text-sm text-gray-700">{feedback.learningNote}</p>
+                      </div>
+                    )}
 
                     <div className="flex items-center justify-between">
                       <Badge variant="outline" className="text-xs">

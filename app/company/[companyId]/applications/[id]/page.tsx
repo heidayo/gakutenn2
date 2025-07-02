@@ -91,7 +91,7 @@ export default function ApplicantDetailPage() {
       // Fetch company feedback for this application
       const { data: feedbackData, error: feedbackError } = await supabase
         .from("feedbacks")
-        .select("overall_comment")
+        .select("id")
         .eq("job_id", appData.job_id)
         .eq("student_id", appData.user_id);
       if (feedbackError) console.error("Error fetching feedback:", feedbackError);
@@ -104,8 +104,30 @@ export default function ApplicantDetailPage() {
         .single();
       if (companyError) console.error("Error fetching company:", companyError);
 
-      // Combine and set applicant, including job, feedback, and company
-      setApplicant({ ...appData, profiles: profileData, job: jobData, feedback: feedbackData, company: companyData });
+      // Fetch student's learning notes linked to feedback entries
+      const feedbackIds = (feedbackData ?? []).map((fb: any) => fb.id);
+      const { data: notesData, error: notesError } = await (supabase as any)
+        .from("learning_notes")
+        .select("note, created_at")
+        .in("feedback_id", feedbackIds);
+      if (notesError) console.error("Error fetching learning notes:", notesError);
+      // Transform notes for display
+      const learningNotes = (notesData ?? []).map((ln: any) => ({
+        company: companyData?.name ?? "",
+        date: new Date(ln.created_at).toLocaleDateString("ja-JP"),
+        content: ln.note,
+        skills: [] as string[],
+      }));
+
+      // Combine and set applicant, including job, feedback, company, and learning notes
+      setApplicant({
+        ...appData,
+        profiles: profileData,
+        job: jobData,
+        feedback: feedbackData,
+        company: companyData,
+        learningNotes,
+      });
       setLoading(false);
     };
     fetchApplicant();

@@ -552,6 +552,38 @@ export type Database = {
           },
         ]
       }
+      learning_notes: {
+        Row: {
+          created_at: string
+          feedback_id: string
+          id: string
+          note: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          feedback_id: string
+          id?: string
+          note: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          feedback_id?: string
+          id?: string
+          note?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "learning_notes_feedback_id_fkey"
+            columns: ["feedback_id"]
+            isOneToOne: false
+            referencedRelation: "feedbacks"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           application_id: string
