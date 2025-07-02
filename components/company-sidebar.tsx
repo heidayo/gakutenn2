@@ -1,10 +1,10 @@
 "use client";
 
-import { BarChart3, Briefcase, Users, MessageSquare, Settings, Building2, Plus, FileText, Star, Calendar } from "lucide-react"
+import { BarChart3, Briefcase, Users, MessageSquare, Settings, Building2, Plus, FileText, Star, Calendar, LogOut } from "lucide-react"
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase/client";
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Logo } from "@/components/logo"
 import {
   Sidebar,
@@ -69,6 +69,7 @@ export function CompanySidebar() {
   const [unreadMessagesCount, setUnreadMessagesCount] = useState<number>(0);
 
   const pathname = usePathname()
+  const router = useRouter();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -275,6 +276,26 @@ export function CompanySidebar() {
                       </Link>
                     )
                   })()}
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild>
+                  <button
+                    onClick={async () => {
+                      await supabase.auth.signOut();
+                      router.push('/');
+                    }}
+                    disabled={companyId === ''}
+                    className={cn(
+                      'flex items-center space-x-3 px-3 py-2 rounded-lg',
+                      companyId === ''
+                        ? 'text-gray-400 pointer-events-none'
+                        : 'hover:bg-gray-100'
+                    )}
+                  >
+                    <LogOut className="h-4 w-4" />
+                    <span>ログアウト</span>
+                  </button>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

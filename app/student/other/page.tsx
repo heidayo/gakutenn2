@@ -21,6 +21,10 @@ import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import Link from "next/link"
 
+import { useState, useEffect, useRef } from 'react';
+import { supabase } from '@/lib/supabase/client';
+import { useRouter } from 'next/navigation';
+
 // Menu items for the other page
 const menuSections = [
   {
@@ -104,6 +108,93 @@ const menuSections = [
 ]
 
 export default function StudentOtherPage() {
+  // Supabase profile state
+  const [profileInfo, setProfileInfo] = useState<any>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fields to calculate profile completion
+  const profileFields = [
+    'first_name',
+    'last_name',
+    'full_name',
+    'university',
+    'faculty',
+    'email',
+    'phone',
+    'year',
+    'location',
+    'bio',
+    'avatar_url'
+  ] as const;
+
+  // Fetch profile from Supabase
+  const fetchProfile = async () => {
+    // Get the authenticated user
+    const {
+      data: { user },
+      error: authError
+    } = await supabase.auth.getUser();
+    if (authError) {
+      console.error('Error getting auth user:', authError);
+      return;
+    }
+    if (!user) {
+      console.error('No authenticated user found');
+      return;
+    }
+    // Fetch the profile row matching the user's ID
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+    if (error) {
+      console.error('Error fetching profile:', error);
+    } else if (data) {
+      setProfileInfo(data);
+      setAvatarUrl(data.avatar_url);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfile();
+  }, []);
+
+  const router = useRouter();
+
+  // Handle user logout
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    router.push('/');
+  };
+
+  // Handle avatar file upload
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !profileInfo) return;
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${profileInfo.user_id}.${fileExt}`;
+    const { error: uploadError } = await supabase.storage
+      .from('avatars')
+      .upload(fileName, file, { upsert: true });
+    if (uploadError) {
+      console.error('Error uploading avatar:', uploadError);
+    } else {
+      const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(fileName);
+      setAvatarUrl(urlData.publicUrl);
+      await supabase.from('profiles').update({ avatar_url: urlData.publicUrl }).eq('user_id', profileInfo.user_id);
+    }
+  };
+
+  // Calculate completion percentage
+  const filledCount = profileInfo
+    ? profileFields.reduce((cnt, field) => (profileInfo[field] ? cnt + 1 : cnt), 0)
+    : 0;
+  const completionPercent = profileInfo
+    ? Math.floor((filledCount / profileFields.length) * 100)
+    : 0;
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -111,15 +202,35 @@ export default function StudentOtherPage() {
         <div className="px-4 py-6">
           <div className="flex items-center space-x-4">
             <Avatar className="h-16 w-16">
-              <AvatarImage src="/placeholder.svg?height=64&width=64" alt="プロフィール画像" />
-              <AvatarFallback>山田</AvatarFallback>
+              {avatarUrl ? (
+                <AvatarImage
+                  src={avatarUrl}
+                  alt="プロフィール画像"
+                  className="w-full h-full object-cover"
+                />
+              ) : (
+                <AvatarFallback>
+                  {profileInfo?.full_name?.charAt(0) ?? "U"}
+                </AvatarFallback>
+              )}
+              <input
+                type="file"
+                accept="image/*"
+                ref={fileInputRef}
+                className="hidden"
+                onChange={handleAvatarUpload}
+              />
             </Avatar>
             <div className="flex-1">
-              <h1 className="text-xl font-bold">山田 太郎</h1>
-              <p className="text-gray-600">taro.yamada@example.com</p>
+              <h1 className="text-xl font-bold">
+                {profileInfo?.full_name ?? "氏名未登録"}
+              </h1>
+              <p className="text-gray-600">
+                {profileInfo?.email ?? "メールアドレス未登録"}
+              </p>
               <div className="flex items-center mt-2">
                 <Badge variant="secondary" className="text-xs">
-                  プロフィール完成度: 85%
+                  プロフィール完成度: {completionPercent}%
                 </Badge>
               </div>
             </div>
@@ -170,6 +281,8 @@ export default function StudentOtherPage() {
           <CardContent className="p-0">
             <Button
               variant="ghost"
+              type="button"
+              onClick={handleLogout}
               className="w-full justify-start p-4 h-auto text-red-600 hover:text-red-700 hover:bg-red-50"
             >
               <div className="flex items-center space-x-3">
