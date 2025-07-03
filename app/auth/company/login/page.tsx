@@ -97,22 +97,20 @@ export default function CompanyLoginPage() {
 
   const handleGoogleLogin = async () => {
     setSocialLoading("Google")
-
     try {
-      // 仮のGoogleログインロジック
-      await new Promise((resolve) => setTimeout(resolve, 2000))
-
-      toast({
-        title: "Googleログイン成功！",
-        description: "企業ダッシュボードへ移動します。",
-        variant: "default",
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: `${location.origin}/company/dashboard`
+        }
       })
-
-      window.location.href = "/company/dashboard"
-    } catch (err) {
+      if (error) {
+        throw error
+      }
+    } catch (err: any) {
       toast({
         title: "Googleログインに失敗しました",
-        description: "エラーが発生しました。もう一度お試しください。",
+        description: err.message || "エラーが発生しました。もう一度お試しください。",
         variant: "destructive",
       })
     } finally {

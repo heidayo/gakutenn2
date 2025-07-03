@@ -1,5 +1,7 @@
 "use client"
 
+import type { Provider } from "@supabase/supabase-js"
+
 import type React from "react"
 
 import { useState } from "react"
@@ -51,21 +53,26 @@ export default function StudentLoginPage() {
     setIsLoading(false)
   }
 
-  const handleSocialLogin = async (provider: "google" | "line") => {
+  const handleSocialLogin = async (provider: Provider | "line") => {
     setSocialLoading(provider)
-
-    const { error } = await supabase.auth.signInWithOAuth({
-      // `line` は型定義に無いのでキャストして渡す
-      provider: provider as any,
-      options: { redirectTo: `${location.origin}/student/mypage` },
-    })
-
-    if (error) {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        // provider may include "line", so cast to any
+        provider: provider as any,
+        options: {
+          redirectTo: `${location.origin}/student/mypage`
+        }
+      })
+      if (error) {
+        throw error
+      }
+    } catch (err: any) {
       toast({
         title: `${provider}ログインに失敗しました`,
-        description: error.message,
+        description: err.message || "エラーが発生しました。もう一度お試しください。",
         variant: "destructive",
       })
+    } finally {
       setSocialLoading(null)
     }
   }

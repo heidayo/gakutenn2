@@ -5,6 +5,7 @@ import Link from "next/link"
 import { supabase } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import type { Database } from "@/lib/supabase/types"
+import type { Provider } from "@supabase/supabase-js"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -171,10 +172,24 @@ export default function StudentRegisterPage() {
     }
   }
 
-  const handleSocialLogin = (provider: string) => {
+  const handleSocialLogin = async (provider: Provider | "LINE") => {
     setIsLoading(true)
-    // ソーシャルログイン処理
-    console.log(`${provider}で登録`)
+    setErrors({})  // clear previous errors
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider as any,
+        options: {
+          redirectTo: `${location.origin}/auth/student/register/complete`
+        }
+      })
+      if (error) {
+        throw error
+      }
+    } catch (err: any) {
+      setErrors({ submit: err.message || `${provider}ログインに失敗しました。` })
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   const progressValue = (step / 3) * 100
@@ -233,7 +248,7 @@ export default function StudentRegisterPage() {
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => handleSocialLogin("Google")}
+                    onClick={() => handleSocialLogin("google")}
                     disabled={isLoading}
                   >
                     <Globe className="h-4 w-4 mr-2 text-blue-500" />

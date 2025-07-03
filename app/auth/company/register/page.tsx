@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import type { Provider } from "@supabase/supabase-js"
 import { supabase } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -229,9 +230,24 @@ export default function CompanyRegisterPage() {
     }
   }
 
-  const handleSocialLogin = (provider: string) => {
-    console.log(`${provider} login`)
-    // ソーシャルログイン処理
+  const handleSocialLogin = async (provider: Provider) => {
+    setLoading(true)
+    setErrors({})  // clear previous errors
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider,
+        options: {
+          redirectTo: `${window.location.origin}/auth/company/register/complete`
+        }
+      })
+      if (error) {
+        throw error
+      }
+    } catch (err: any) {
+      setErrors({ submit: err.message || "ソーシャルログインに失敗しました。" })
+    } finally {
+      setLoading(false)
+    }
   }
 
   const updateFormData = (field: string, value: string | boolean) => {
