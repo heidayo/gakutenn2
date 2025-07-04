@@ -279,6 +279,27 @@ export type Database = {
         }
         Relationships: []
       }
+      email_otps: {
+        Row: {
+          created_at: string
+          email: string
+          id: string
+          otp: string
+        }
+        Insert: {
+          created_at?: string
+          email: string
+          id?: string
+          otp: string
+        }
+        Update: {
+          created_at?: string
+          email?: string
+          id?: string
+          otp?: string
+        }
+        Relationships: []
+      }
       feedbacks: {
         Row: {
           comments: Json
@@ -720,6 +741,7 @@ export type Database = {
           faculty: string | null
           first_name: string | null
           full_name: string | null
+          is_verified: boolean
           last_name: string | null
           location: string | null
           phone: string | null
@@ -735,6 +757,7 @@ export type Database = {
           faculty?: string | null
           first_name?: string | null
           full_name?: string | null
+          is_verified?: boolean
           last_name?: string | null
           location?: string | null
           phone?: string | null
@@ -750,6 +773,7 @@ export type Database = {
           faculty?: string | null
           first_name?: string | null
           full_name?: string | null
+          is_verified?: boolean
           last_name?: string | null
           location?: string | null
           phone?: string | null

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,7 +10,29 @@ import { Label } from "@/components/ui/label"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Mail, ArrowLeft, Check, AlertCircle, RefreshCw } from "lucide-react"
 
+// Helper: retry fetch on network failure with exponential backoff
+const fetchWithRetry = async (
+  url: string,
+  options: RequestInit,
+  retries = 3,
+  backoff = 1000
+): Promise<Response> => {
+  try {
+    return await fetch(url, options);
+  } catch (err) {
+    if (retries > 0) {
+      await new Promise((res) => setTimeout(res, backoff));
+      return fetchWithRetry(url, options, retries - 1, backoff * 2);
+    }
+    throw err;
+  }
+};
+
 export default function StudentVerifyPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const email = searchParams.get("email") || "";
+
   const [verificationCode, setVerificationCode] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [isResending, setIsResending] = useState(false)
@@ -26,6 +49,11 @@ export default function StudentVerifyPage() {
     }
   }, [countdown])
 
+  useEffect(() => {
+    // Send initial OTP on first mount
+    handleResend();
+  }, []);
+
   const handleVerify = async () => {
     if (!verificationCode) {
       setError("認証コードを入力してください")
@@ -36,13 +64,23 @@ export default function StudentVerifyPage() {
     setError("")
 
     try {
-      // 認証API呼び出し
-      await new Promise((resolve) => setTimeout(resolve, 2000)) // シミュレーション
-
-      // 認証成功 - 登録完了ページへ
-      window.location.href = "/auth/student/register/complete"
-    } catch (error) {
-      setError("認証コードが正しくありません。もう一度お試しください。")
+      const res = await fetchWithRetry("/api/verify-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, otp: verificationCode }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.ok) {
+        throw new Error(result.error || "認証コードが正しくありません");
+      }
+      // 成功時にプロフィール入力ページへ遷移
+      router.push("/auth/student/register/complete");
+    } catch (error: any) {
+      if (error.message.includes("Failed to fetch")) {
+        setError("通信に失敗しました。しばらくしてから再試行してください。");
+      } else {
+        setError(error.message);
+      }
     } finally {
       setIsLoading(false)
     }
@@ -53,13 +91,15 @@ export default function StudentVerifyPage() {
     setError("")
 
     try {
-      // 再送信API呼び出し
-      await new Promise((resolve) => setTimeout(resolve, 1000)) // シミュレーション
-
+      await fetchWithRetry("/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email }),
+      });
       setCountdown(60)
       setCanResend(false)
     } catch (error) {
-      setError("メールの再送信に失敗しました。しばらく後にお試しください。")
+      setError("通信に失敗しました。しばらくしてから再試行してください。")
     } finally {
       setIsResending(false)
     }
@@ -90,7 +130,7 @@ export default function StudentVerifyPage() {
             <CardDescription>
               登録したメールアドレスに6桁の認証コードを送信しました。
               <br />
-              <strong>example@email.com</strong>
+              <strong>{email}</strong>
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -100,7 +140,17 @@ export default function StudentVerifyPage() {
                 id="verificationCode"
                 type="text"
                 value={verificationCode}
-                onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                onChange={(e) =>
+                  setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))
+                }
+                onPaste={(e) => {
+                  e.preventDefault();
+                  const pasted = e.clipboardData
+                    .getData("text")
+                    .replace(/\D/g, "")
+                    .slice(0, 6);
+                  setVerificationCode(pasted);
+                }}
                 placeholder="123456"
                 className="text-center text-lg tracking-widest"
                 maxLength={6}
@@ -117,7 +167,7 @@ export default function StudentVerifyPage() {
 
             <Button
               onClick={handleVerify}
-              disabled={isLoading || verificationCode.length !== 6}
+              disabled={isLoading || isResending || verificationCode.length !== 6}
               className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
             >
               {isLoading ? (
@@ -133,16 +183,14 @@ export default function StudentVerifyPage() {
             {/* 再送信 */}
             <div className="text-center">
               <p className="text-sm text-gray-600 mb-2">メールが届かない場合</p>
-              <Button variant="outline" onClick={handleResend} disabled={!canResend || isResending} className="text-sm">
+              <Button variant="outline" onClick={handleResend} disabled={!canResend || isResending || isLoading} className="text-sm">
                 {isResending ? (
                   <>
                     <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
                     送信中...
                   </>
-                ) : canResend ? (
-                  "認証メールを再送信"
                 ) : (
-                  `再送信まで ${countdown}秒`
+                  "認証メールを再送信"
                 )}
               </Button>
             </div>

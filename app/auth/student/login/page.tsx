@@ -15,6 +15,7 @@ import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { useRouter } from "next/navigation"
 import { supabase } from "@/lib/supabase/client"
+import { signInWith2FA } from "@/lib/supabase/auth"
 
 export default function StudentLoginPage() {
   const { toast } = useToast()
@@ -28,22 +29,17 @@ export default function StudentLoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setIsLoading(true)
-
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
+    try {
+      await signInWith2FA(email, password);
+    } catch (err: any) {
       toast({
         title: "ログインに失敗しました",
-        description: error.message,
+        description: err.message,
         variant: "destructive",
       })
       setIsLoading(false)
       return
     }
-
     toast({
       title: "ログイン成功！",
       description: "マイページへ移動します。",

@@ -86,14 +86,17 @@ export default function StudentRegisterPage() {
     return Object.keys(newErrors).length === 0
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
     let isValid = false
 
     if (step === 1) isValid = validateStep1()
     else if (step === 2) isValid = validateStep2()
     else if (step === 3) isValid = validateStep3()
 
-    if (isValid && step < 3) {
+    if (isValid && step === 1) {
+      setStep(2);
+      return;
+    } else if (isValid && step < 3) {
       setStep(step + 1)
     } else if (isValid && step === 3) {
       handleSubmit()
@@ -163,8 +166,13 @@ export default function StudentRegisterPage() {
         }
       }
 
-      // 3) 完了ページへリダイレクト
-      router.push("/auth/student/register/complete")
+      // After registration, send OTP and go to verification step
+      await fetch("/api/send-otp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email })
+      });
+      router.push(`/auth/student/register/verify?email=${encodeURIComponent(email)}`);
     } catch (err: any) {
       setErrors({ submit: err.message ?? "登録に失敗しました。もう一度お試しください。" })
     } finally {
@@ -233,7 +241,7 @@ export default function StudentRegisterPage() {
           <CardContent className="space-y-4">
             {/* ステップ1: アカウント情報 */}
             {step === 1 && (
-              <>
+              <form onSubmit={(e) => { e.preventDefault(); handleNext(); }}>
                 {/* ソーシャルログインボタン */}
                 <div className="space-y-3">
                   <Button
@@ -271,7 +279,9 @@ export default function StudentRegisterPage() {
                     <Label htmlFor="email">メールアドレス</Label>
                     <Input
                       id="email"
+                      name="email"
                       type="email"
+                      autoComplete="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       className={errors.email ? "border-red-500" : ""}
@@ -288,6 +298,8 @@ export default function StudentRegisterPage() {
                         value={formData.password}
                         onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                         className={errors.password ? "border-red-500" : ""}
+                        name="password"
+                        autoComplete="new-password"
                       />
                       <Button
                         type="button"
@@ -312,6 +324,8 @@ export default function StudentRegisterPage() {
                         value={formData.confirmPassword}
                         onChange={(e) => setFormData({ ...formData, confirmPassword: e.target.value })}
                         className={errors.confirmPassword ? "border-red-500" : ""}
+                        name="confirmPassword"
+                        autoComplete="new-password"
                       />
                       <Button
                         type="button"
@@ -326,7 +340,22 @@ export default function StudentRegisterPage() {
                     {errors.confirmPassword && <p className="text-sm text-red-500 mt-1">{errors.confirmPassword}</p>}
                   </div>
                 </div>
-              </>
+                {/* Navigation buttons */}
+                <div className="flex justify-between pt-4">
+                  <Button type="button" variant="outline" onClick={() => setStep(step - 1)} disabled={step === 1 || isLoading}>
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    戻る
+                  </Button>
+                  <Button type="submit" disabled={isLoading} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                    {isLoading ? "処理中..." : (
+                      <>
+                        次へ
+                        <ArrowRight className="h-4 w-4 ml-2" />
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </form>
             )}
 
             {/* ステップ2: 基本情報 */}
@@ -490,31 +519,33 @@ export default function StudentRegisterPage() {
             )}
 
             {/* ナビゲーションボタン */}
-            <div className="flex justify-between pt-4">
-              <Button variant="outline" onClick={() => setStep(step - 1)} disabled={step === 1 || isLoading}>
-                <ArrowLeft className="h-4 w-4 mr-2" />
-                戻る
-              </Button>
-              <Button
-                onClick={handleNext}
-                disabled={isLoading}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
-              >
-                {isLoading ? (
-                  "処理中..."
-                ) : step === 3 ? (
-                  <>
-                    アカウント作成
-                    <Check className="h-4 w-4 ml-2" />
-                  </>
-                ) : (
-                  <>
-                    次へ
-                    <ArrowRight className="h-4 w-4 ml-2" />
-                  </>
-                )}
-              </Button>
-            </div>
+            {step !== 1 && (
+              <div className="flex justify-between pt-4">
+                <Button variant="outline" onClick={() => setStep(step - 1)} disabled={step === 1 || isLoading}>
+                  <ArrowLeft className="h-4 w-4 mr-2" />
+                  戻る
+                </Button>
+                <Button
+                  onClick={handleNext}
+                  disabled={isLoading}
+                  className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
+                >
+                  {isLoading ? (
+                    "処理中..."
+                  ) : step === 3 ? (
+                    <>
+                      アカウント作成
+                      <Check className="h-4 w-4 ml-2" />
+                    </>
+                  ) : (
+                    <>
+                      次へ
+                      <ArrowRight className="h-4 w-4 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            )}
           </CardContent>
         </Card>
 
