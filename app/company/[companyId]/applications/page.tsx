@@ -148,14 +148,6 @@ export default function ApplicationsPage() {
             <h1 className="text-2xl font-bold">応募者管理</h1>
             <p className="text-sm text-gray-600">求人への応募者を確認・管理できます</p>
           </div>
-          <div className="flex items-center space-x-3">
-            <Button variant="outline">
-              CSV出力
-            </Button>
-            <Button variant="outline">
-              フィルター
-            </Button>
-          </div>
         </div>
       </header>
 

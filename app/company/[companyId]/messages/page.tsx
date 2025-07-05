@@ -4,7 +4,6 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
   Search,
@@ -12,8 +11,6 @@ import {
   Clock,
   CheckCheck,
   Star,
-  Archive,
-  Filter,
   MoreVertical,
   User,
   Calendar,
@@ -30,7 +27,6 @@ import { supabase } from "@/lib/supabase/client"
 
 export default function CompanyMessagesPage() {
   const [searchQuery, setSearchQuery] = useState("")
-  const [statusFilter, setStatusFilter] = useState("all")
   const [selectedChat, setSelectedChat] = useState<string | null>(null)
 
   const params = useParams<{ companyId: string }>()
@@ -367,13 +363,10 @@ export default function CompanyMessagesPage() {
     }
   }
 
-  const filteredChatRooms = chatRooms.filter((room) => {
-    const matchesSearch =
-      room.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      room.job.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === "all" || room.status === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const filteredChatRooms = chatRooms.filter((room) =>
+    room.student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    room.job.toLowerCase().includes(searchQuery.toLowerCase())
+  )
 
   const selectedChatData = chatRooms.find((room) => room.applicationId === selectedChat)
 
@@ -386,39 +379,12 @@ export default function CompanyMessagesPage() {
             <h1 className="text-2xl font-bold">メッセージ管理</h1>
             <p className="text-sm text-gray-600">学生とのコミュニケーション管理</p>
           </div>
-          <div className="flex items-center space-x-3">
-            <Button variant="outline" size="sm">
-              <Archive className="h-4 w-4 mr-2" />
-              アーカイブ
-            </Button>
-            <Button variant="outline" size="sm">
-              <Filter className="h-4 w-4 mr-2" />
-              フィルター
-            </Button>
-          </div>
         </div>
       </header>
 
       <div className="flex h-[calc(100vh-80px)]">
         {/* Left Sidebar - Chat List */}
         <div className="w-96 bg-white border-r flex flex-col">
-          {/* Stats */}
-          <div className="p-4 border-b bg-gray-50">
-            <div className="grid grid-cols-3 gap-4 text-center">
-              <div>
-                <div className="text-lg font-bold text-blue-600">{messageStats.total}</div>
-                <div className="text-xs text-gray-600">総メッセージ</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-red-600">{messageStats.unread}</div>
-                <div className="text-xs text-gray-600">未読</div>
-              </div>
-              <div>
-                <div className="text-lg font-bold text-orange-600">{messageStats.urgent}</div>
-                <div className="text-xs text-gray-600">緊急</div>
-              </div>
-            </div>
-          </div>
 
           {/* Search and Filter */}
           <div className="p-4 space-y-3 border-b">
@@ -431,28 +397,11 @@ export default function CompanyMessagesPage() {
                 className="pl-10"
               />
             </div>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="ステータスで絞り込み" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">すべて</SelectItem>
-                <SelectItem value="面談調整中">面談調整中</SelectItem>
-                <SelectItem value="書類確認中">書類確認中</SelectItem>
-                <SelectItem value="面談予定">面談予定</SelectItem>
-                <SelectItem value="完了">完了</SelectItem>
-              </SelectContent>
-            </Select>
           </div>
 
           {/* Chat List */}
           <div className="flex-1 overflow-y-auto">
             <Tabs defaultValue="active" className="w-full">
-              <TabsList className="grid w-full grid-cols-3 mx-4 mt-2">
-                <TabsTrigger value="active">アクティブ</TabsTrigger>
-                <TabsTrigger value="archived">アーカイブ</TabsTrigger>
-                <TabsTrigger value="urgent">緊急</TabsTrigger>
-              </TabsList>
 
               <TabsContent value="active" className="mt-0">
                 <div className="space-y-1 p-2">
@@ -516,13 +465,6 @@ export default function CompanyMessagesPage() {
                       </div>
                     </div>
                   ))}
-                </div>
-              </TabsContent>
-
-              <TabsContent value="archived" className="mt-0">
-                <div className="p-4 text-center text-gray-500">
-                  <Archive className="h-8 w-8 mx-auto mb-2 text-gray-300" />
-                  <p className="text-sm">アーカイブされたメッセージはありません</p>
                 </div>
               </TabsContent>
 
@@ -686,19 +628,6 @@ export default function CompanyMessagesPage() {
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
-
-                {/* Quick Replies */}
-                <div className="flex flex-wrap gap-2 mt-3">
-                  <Button variant="outline" size="sm" className="text-xs">
-                    面談日程を調整しましょう
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-xs">
-                    書類を確認いたします
-                  </Button>
-                  <Button variant="outline" size="sm" className="text-xs">
-                    ありがとうございます
-                  </Button>
-                </div>
               </div>
             </>
           ) : (
@@ -751,25 +680,6 @@ export default function CompanyMessagesPage() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">メッセージ統計</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">総メッセージ数:</span>
-                  <span className="font-semibold">24</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">平均応答時間:</span>
-                  <span className="font-semibold">1.2時間</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-600">最終メッセージ:</span>
-                  <span className="font-semibold">{selectedChatData.timestamp}</span>
-                </div>
-              </CardContent>
-            </Card>
 
             <div className="space-y-3">
               <Link href={companyId ? `/company/${companyId}/applications/${selectedChatData.applicationId}` : "#"}>
@@ -781,10 +691,6 @@ export default function CompanyMessagesPage() {
               <Button className="w-full" variant="outline">
                 <Calendar className="h-4 w-4 mr-2" />
                 面談をスケジュール
-              </Button>
-              <Button className="w-full" variant="outline">
-                <Archive className="h-4 w-4 mr-2" />
-                アーカイブ
               </Button>
             </div>
           </div>

@@ -21,7 +21,6 @@ import {
   Search,
   MoreVertical,
   Edit,
-  Bell,
   Users,
   CheckCircle,
   XCircle,
@@ -39,7 +38,6 @@ export default function CompanyInterviewsPage() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [typeFilter, setTypeFilter] = useState("all")
   const [showCreateDialog, setShowCreateDialog] = useState(false)
-  const [showSettingsDialog, setShowSettingsDialog] = useState(false)
   const [selectedInterviews, setSelectedInterviews] = useState<number[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(new Date())
@@ -209,13 +207,6 @@ export default function CompanyInterviewsPage() {
     setIsLoading(false);
   };
 
-  // リマインド設定
-  const [reminderSettings, setReminderSettings] = useState({
-    email: true,
-    push: true,
-    sms: false,
-    timings: ["1日前", "1時間前", "15分前"],
-  })
 
   // フィルタリング
   const filteredInterviews = interviews.filter((interview) => {
@@ -285,10 +276,6 @@ export default function CompanyInterviewsPage() {
     setSelectedInterviews([])
   }
 
-  const handleSendReminder = (id: number) => {
-    console.log(`Sending reminder for interview ${id}`)
-    alert("リマインダーを送信しました！")
-  }
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -352,14 +339,6 @@ export default function CompanyInterviewsPage() {
                 <Button className="bg-blue-600 hover:bg-blue-700">
                   <Plus className="h-4 w-4 mr-2" />
                   面談を作成
-                </Button>
-              </DialogTrigger>
-            </Dialog>
-            <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Bell className="h-4 w-4 mr-2" />
-                  設定
                 </Button>
               </DialogTrigger>
             </Dialog>
@@ -428,12 +407,7 @@ export default function CompanyInterviewsPage() {
         </div>
 
         <Tabs defaultValue="list" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="list">面談一覧</TabsTrigger>
-            <TabsTrigger value="calendar">カレンダー</TabsTrigger>
-            <TabsTrigger value="schedule">面談枠設定</TabsTrigger>
-            <TabsTrigger value="analytics">分析</TabsTrigger>
-          </TabsList>
+
 
           {/* 面談一覧 */}
           <TabsContent value="list" className="space-y-6">
@@ -478,10 +452,6 @@ export default function CompanyInterviewsPage() {
                   {selectedInterviews.length > 0 && (
                     <div className="flex items-center space-x-2">
                       <span className="text-sm text-gray-600">{selectedInterviews.length}件選択中</span>
-                      <Button size="sm" onClick={() => handleBulkAction("reminder")}>
-                        <Bell className="h-4 w-4 mr-1" />
-                        一括リマインド
-                      </Button>
                       <Button size="sm" variant="outline" onClick={() => handleBulkAction("cancel")}>
                         <XCircle className="h-4 w-4 mr-1" />
                         一括キャンセル
@@ -557,10 +527,6 @@ export default function CompanyInterviewsPage() {
                         <div className="flex items-center space-x-2">
                           {interview.status === "予定" || interview.status === "確定" ? (
                             <>
-                              <Button size="sm" onClick={() => handleSendReminder(interview.id)}>
-                                <Bell className="h-4 w-4 mr-1" />
-                                リマインド
-                              </Button>
                               <Select onValueChange={(value) => handleStatusChange(interview.id, value)}>
                                 <SelectTrigger className="w-32">
                                   <SelectValue placeholder="ステータス変更" />
@@ -604,152 +570,11 @@ export default function CompanyInterviewsPage() {
             </Card>
           </TabsContent>
 
-          {/* カレンダー表示 */}
-          <TabsContent value="calendar" className="space-y-6">
-            <div className="grid grid-cols-3 gap-6">
-              <div className="col-span-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>面談カレンダー</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      className="rounded-md border"
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-              <div>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{selectedDate?.toLocaleDateString("ja-JP")} の面談</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {interviews
-                        .filter((interview) => interview.date === selectedDate?.toLocaleDateString("ja-JP"))
-                        .map((interview) => (
-                          <div key={interview.id} className="p-3 border rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-semibold text-sm">{interview.applicant}</h4>
-                              <Badge className={`${getStatusColor(interview.status)} text-xs`}>
-                                {interview.status}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-gray-600 mb-1">{interview.job}</p>
-                            <div className="flex items-center space-x-2 text-xs text-gray-500">
-                              <Clock className="h-3 w-3" />
-                              <span>{interview.time}</span>
-                              {getTypeIcon(interview.type)}
-                              <span>{interview.type}</span>
-                            </div>
-                          </div>
-                        ))}
-                      {interviews.filter((interview) => interview.date === selectedDate?.toLocaleDateString("ja-JP"))
-                        .length === 0 && (
-                        <p className="text-sm text-gray-500 text-center py-4">この日の面談はありません</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
+          
 
-          {/* 面談枠設定 */}
-          <TabsContent value="schedule" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>面談可能時間の設定</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {timeSlots.map((slot) => (
-                    <div key={slot.id} className="border rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-3">
-                        <h4 className="font-semibold">{slot.day}</h4>
-                        <Button size="sm" variant="outline">
-                          <Edit className="h-4 w-4 mr-1" />
-                          編集
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-6 gap-2">
-                        {slot.times.map((time) => (
-                          <Badge key={time} variant="outline" className="justify-center">
-                            {time}
-                          </Badge>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+          
 
-          {/* 分析 */}
-          <TabsContent value="analytics" className="space-y-6">
-            <div className="grid grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>面談実施状況</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">今月の面談数</span>
-                      <span className="font-semibold">24件</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">平均面談時間</span>
-                      <span className="font-semibold">52分</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">キャンセル率</span>
-                      <span className="font-semibold">8.3%</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm">面談後採用率</span>
-                      <span className="font-semibold">65%</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card>
-                <CardHeader>
-                  <CardTitle>面談形式別統計</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Video className="h-4 w-4" />
-                        <span className="text-sm">オンライン</span>
-                      </div>
-                      <span className="font-semibold">15件 (62.5%)</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <MapPin className="h-4 w-4" />
-                        <span className="text-sm">対面</span>
-                      </div>
-                      <span className="font-semibold">7件 (29.2%)</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <Phone className="h-4 w-4" />
-                        <span className="text-sm">電話</span>
-                      </div>
-                      <span className="font-semibold">2件 (8.3%)</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
+          
         </Tabs>
       </div>
 
@@ -856,84 +681,6 @@ export default function CompanyInterviewsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* リマインダー設定ダイアログ */}
-      <Dialog open={showSettingsDialog} onOpenChange={setShowSettingsDialog}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>リマインダー設定</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-3">
-              <Label>通知方法</Label>
-              <div className="space-y-2">
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="email"
-                    checked={reminderSettings.email}
-                    onCheckedChange={(checked) =>
-                      setReminderSettings((prev) => ({ ...prev, email: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="email">メール通知</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="push"
-                    checked={reminderSettings.push}
-                    onCheckedChange={(checked) =>
-                      setReminderSettings((prev) => ({ ...prev, push: checked as boolean }))
-                    }
-                  />
-                  <Label htmlFor="push">プッシュ通知</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="sms"
-                    checked={reminderSettings.sms}
-                    onCheckedChange={(checked) => setReminderSettings((prev) => ({ ...prev, sms: checked as boolean }))}
-                  />
-                  <Label htmlFor="sms">SMS通知</Label>
-                </div>
-              </div>
-            </div>
-            <div className="space-y-3">
-              <Label>通知タイミング</Label>
-              <div className="space-y-2">
-                {["1週間前", "1日前", "1時間前", "15分前"].map((timing) => (
-                  <div key={timing} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`timing-${timing}`}
-                      checked={reminderSettings.timings.includes(timing)}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setReminderSettings((prev) => ({
-                            ...prev,
-                            timings: [...prev.timings, timing],
-                          }))
-                        } else {
-                          setReminderSettings((prev) => ({
-                            ...prev,
-                            timings: prev.timings.filter((t) => t !== timing),
-                          }))
-                        }
-                      }}
-                    />
-                    <Label htmlFor={`timing-${timing}`}>{timing}</Label>
-                  </div>
-                ))}
-              </div>
-            </div>
-            <div className="flex space-x-2">
-              <Button variant="outline" onClick={() => setShowSettingsDialog(false)} className="flex-1">
-                キャンセル
-              </Button>
-              <Button onClick={() => setShowSettingsDialog(false)} className="flex-1 bg-blue-600 hover:bg-blue-700">
-                設定を保存
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

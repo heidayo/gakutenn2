@@ -321,54 +321,6 @@ export default function CompanyDashboard() {
           </Card>
         </div>
 
-        {/* Secondary Metrics */}
-        <div className="grid grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">面談実施数</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600 mb-2">{kpis.totalInterviews.value}</div>
-              <div className="flex items-center space-x-1">
-                {getTrendIcon(kpis.totalInterviews.trend, kpis.totalInterviews.change)}
-                <p className={`text-xs ${getTrendColor(kpis.totalInterviews.trend)}`}>
-                  +{kpis.totalInterviews.change}% (30日)
-                </p>
-              </div>
-              <Progress value={65} className="mt-3 h-2" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">応答率</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600 mb-2">{kpis.responseRate.value}%</div>
-              <div className="flex items-center space-x-1">
-                {getTrendIcon(kpis.responseRate.trend, kpis.responseRate.change)}
-                <p className={`text-xs ${getTrendColor(kpis.responseRate.trend)}`}>
-                  {kpis.responseRate.change}% (30日)
-                </p>
-              </div>
-              <Progress value={kpis.responseRate.value} className="mt-3 h-2" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">公開中求人</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600 mb-2">{kpis.activeJobs.value}</div>
-              <div className="flex items-center space-x-1">
-                {getTrendIcon(kpis.activeJobs.trend, kpis.activeJobs.change)}
-                <p className={`text-xs ${getTrendColor(kpis.activeJobs.trend)}`}>+{kpis.activeJobs.change}% (30日)</p>
-              </div>
-              <Progress value={67} className="mt-3 h-2" />
-            </CardContent>
-          </Card>
-        </div>
 
         <div className="grid grid-cols-2 gap-6">
           {/* Recent Applications */}
@@ -455,56 +407,6 @@ export default function CompanyDashboard() {
           </Card>
         </div>
 
-        {/* Job Performance */}
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="text-base">求人パフォーマンス</CardTitle>
-              <Link href={companyId ? `/company/${companyId}/jobs` : "#"}>
-                <Button variant="ghost" size="sm">
-                  求人管理
-                  <ArrowRight className="ml-1 h-4 w-4" />
-                </Button>
-              </Link>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {jobPerformance.map((job) => (
-                <div key={job.id} className="flex items-center justify-between p-4 border rounded-lg">
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-3 mb-2">
-                      <h4 className="font-semibold">{job.title}</h4>
-                      <Badge className={getStatusColor(job.status)}>{job.status}</Badge>
-                    </div>
-                    <div className="grid grid-cols-4 gap-4 text-sm">
-                      <div>
-                        <span className="text-gray-600">閲覧数: </span>
-                        <span className="font-semibold">{job.views}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">応募数: </span>
-                        <span className="font-semibold">{job.applications}</span>
-                      </div>
-                      <div>
-                        <span className="text-gray-600">応募率: </span>
-                        <span className="font-semibold">{job.conversionRate}%</span>
-                      </div>
-                      <div className="flex items-center space-x-2">
-                        <Link href={companyId ? `/company/${companyId}/jobs/${job.id}/edit` : "#"}>
-                          <Button variant="outline" size="sm">
-                            <Eye className="h-4 w-4 mr-1" />
-                            詳細
-                          </Button>
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Quick Actions */}
         <div className="grid grid-cols-4 gap-4">
@@ -540,18 +442,6 @@ export default function CompanyDashboard() {
                 </div>
                 <h3 className="font-semibold text-sm">メッセージ</h3>
                 <p className="text-xs text-gray-600 mt-1">学生とのやり取り</p>
-              </CardContent>
-            </Card>
-          </Link>
-
-          <Link href={companyId ? `/company/${companyId}/analytics` : "#"}>
-            <Card className="hover:shadow-md transition-shadow cursor-pointer">
-              <CardContent className="p-6 text-center">
-                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                  <BarChart3 className="h-6 w-6 text-orange-600" />
-                </div>
-                <h3 className="font-semibold text-sm">分析レポート</h3>
-                <p className="text-xs text-gray-600 mt-1">採用データを分析</p>
               </CardContent>
             </Card>
           </Link>

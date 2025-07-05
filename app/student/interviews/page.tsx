@@ -34,8 +34,6 @@ export default function StudentInterviewsPage() {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date())
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  const [showRescheduleDialog, setShowRescheduleDialog] = useState(false)
-  const [selectedInterview, setSelectedInterview] = useState<number | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [lastUpdated, setLastUpdated] = useState(new Date())
 
@@ -124,10 +122,6 @@ export default function StudentInterviewsPage() {
     await fetchInterviews()
   }
 
-  const handleReschedule = (id: number) => {
-    setSelectedInterview(id)
-    setShowRescheduleDialog(true)
-  }
 
   const handleCancel = (id: number) => {
     if (confirm("面談をキャンセルしますか？")) {
@@ -275,13 +269,7 @@ export default function StudentInterviewsPage() {
         )}
 
         <Tabs defaultValue="list" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="list">面談一覧</TabsTrigger>
-            <TabsTrigger value="calendar">カレンダー</TabsTrigger>
-            <TabsTrigger value="preparation">準備</TabsTrigger>
-          </TabsList>
 
-          {/* 面談一覧 */}
           <TabsContent value="list" className="space-y-6">
             {/* 検索・フィルター */}
             <Card>
@@ -404,36 +392,14 @@ export default function StudentInterviewsPage() {
                           )}
                         </div>
                       </div>
-
                       <div className="flex flex-col space-y-2">
                         {interview.status === "予定" || interview.status === "確定" ? (
-                          <>
-                            <Link href={`/student/messages/${interview.id}`}>
-                              <Button size="sm" variant="outline">
-                                <MessageSquare className="h-4 w-4 mr-1" />
-                                メッセージ
-                              </Button>
-                            </Link>
-                            {interview.canReschedule && (
-                              <Button size="sm" variant="outline" onClick={() => handleReschedule(interview.id)}>
-                                日程変更
-                              </Button>
-                            )}
-                            <Button size="sm" variant="outline" onClick={() => handleCancel(interview.id)}>
-                              キャンセル
-                            </Button>
-                          </>
-                        ) : interview.status === "完了" ? (
-                          <Link href={`/student/feedback/${interview.id}`}>
+                          <Link href={`/student/messages/${interview.id}`}>
                             <Button size="sm" variant="outline">
-                              <Star className="h-4 w-4 mr-1" />
-                              詳細
+                              <MessageSquare className="h-4 w-4 mr-1" />
+                              メッセージ
                             </Button>
                           </Link>
-                        ) : interview.canReschedule ? (
-                          <Button size="sm" onClick={() => handleReschedule(interview.id)}>
-                            再スケジュール
-                          </Button>
                         ) : null}
                       </div>
                     </div>
@@ -442,175 +408,9 @@ export default function StudentInterviewsPage() {
               ))}
             </div>
           </TabsContent>
-
-          {/* カレンダー表示 */}
-          <TabsContent value="calendar" className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <div className="md:col-span-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>面談カレンダー</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      className="rounded-md border"
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-              <div>
-                <Card>
-                  <CardHeader>
-                    <CardTitle>{selectedDate?.toLocaleDateString("ja-JP")} の面談</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {interviews
-                        .filter((interview) => interview.date === selectedDate?.toLocaleDateString("ja-JP"))
-                        .map((interview) => (
-                          <div key={interview.id} className="p-3 border rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
-                              <h4 className="font-semibold text-sm">{interview.company}</h4>
-                              <Badge className={getStatusColor(interview.status)}>
-                                {interview.status}
-                              </Badge>
-                            </div>
-                            <p className="text-xs text-gray-600 mb-1">{interview.job}</p>
-                            <div className="flex items-center space-x-2 text-xs text-gray-500">
-                              <Clock className="h-3 w-3" />
-                              <span>{interview.time}</span>
-                              {getTypeIcon(interview.type)}
-                              <span>{interview.type}</span>
-                            </div>
-                          </div>
-                        ))}
-                      {interviews.filter((interview) => interview.date === selectedDate?.toLocaleDateString("ja-JP"))
-                        .length === 0 && (
-                        <p className="text-sm text-gray-500 text-center py-4">この日の面談はありません</p>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </TabsContent>
-
-          {/* 面談準備 */}
-          <TabsContent value="preparation" className="space-y-6">
-            <div className="space-y-4">
-              {interviews
-                .filter((i) => i.status === "予定" || i.status === "確定")
-                .map((interview) => (
-                  <Card key={interview.id}>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-base">{interview.company}</CardTitle>
-                          <p className="text-sm text-gray-600">{interview.job}</p>
-                          <p className="text-sm text-gray-500">
-                            {interview.date} {interview.time}
-                          </p>
-                        </div>
-                        <Badge className={getStatusColor(interview.status)}>{interview.status}</Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      {interview.preparation && (
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-sm">面談準備チェックリスト</h4>
-                          <div className="space-y-2">
-                            {interview.preparation.map((item: string, index: number) => (
-                              <div key={index} className="flex items-center space-x-2">
-                                <input type="checkbox" className="rounded" />
-                                <span className="text-sm">{item}</span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {interview.meetingLink && (
-                        <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-                          <h5 className="font-semibold text-sm mb-2">オンライン面談情報</h5>
-                          <p className="text-sm text-gray-600 mb-2">面談開始5分前にリンクをクリックしてください</p>
-                          <Button size="sm" variant="outline" onClick={() => handleJoinMeeting(interview.meetingLink!)}>
-                            <Video className="h-4 w-4 mr-1" />
-                            面談リンクをテスト
-                          </Button>
-                        </div>
-                      )}
-                      {interview.location && (
-                        <div className="mt-4 p-3 bg-green-50 rounded-lg">
-                          <h5 className="font-semibold text-sm mb-2">対面面談情報</h5>
-                          <p className="text-sm text-gray-600 mb-1">
-                            <MapPin className="h-4 w-4 inline mr-1" />
-                            {interview.location}
-                          </p>
-                          {interview.address && <p className="text-sm text-gray-600">{interview.address}</p>}
-                          <Button size="sm" variant="outline" className="mt-2">
-                            <MapPin className="h-4 w-4 mr-1" />
-                            地図で確認
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                ))}
-            </div>
-          </TabsContent>
         </Tabs>
       </div>
 
-      {/* 日程変更ダイアログ */}
-      <Dialog open={showRescheduleDialog} onOpenChange={setShowRescheduleDialog}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>面談日程の変更</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>希望日</Label>
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                className="rounded-md border"
-                disabled={(date) => date < new Date()}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>希望時間</Label>
-              <Select>
-                <SelectTrigger>
-                  <SelectValue placeholder="時間を選択" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="09:00">09:00-10:00</SelectItem>
-                  <SelectItem value="10:00">10:00-11:00</SelectItem>
-                  <SelectItem value="11:00">11:00-12:00</SelectItem>
-                  <SelectItem value="14:00">14:00-15:00</SelectItem>
-                  <SelectItem value="15:00">15:00-16:00</SelectItem>
-                  <SelectItem value="16:00">16:00-17:00</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label>変更理由（任意）</Label>
-              <Textarea placeholder="日程変更の理由があれば入力してください..." />
-            </div>
-            <div className="flex space-x-2">
-              <Button variant="outline" onClick={() => setShowRescheduleDialog(false)} className="flex-1">
-                キャンセル
-              </Button>
-              <Button onClick={() => setShowRescheduleDialog(false)} className="flex-1 bg-blue-600 hover:bg-blue-700">
-                変更を申請
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t z-50">

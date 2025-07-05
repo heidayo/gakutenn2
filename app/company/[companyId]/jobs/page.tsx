@@ -353,10 +353,6 @@ interface JobRow {
             <p className="text-sm text-gray-600">求人の作成・編集・統計を管理できます</p>
           </div>
           <div className="flex items-center space-x-3">
-            <Button variant="outline">
-              <Download className="h-4 w-4 mr-2" />
-              レポート出力
-            </Button>
             <Link href={companyId ? `/company/${companyId}/jobs/create` : "#"}>
               <Button className="bg-blue-600 hover:bg-blue-700">
                 <Plus className="h-4 w-4 mr-2" />
@@ -368,119 +364,9 @@ interface JobRow {
       </header>
 
       <div className="p-6 space-y-6">
-        {/* Stats Overview */}
-        <div className="grid grid-cols-4 gap-6">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">総求人数</p>
-                  <p className="text-2xl font-bold">{stats.totalJobs}</p>
-                  <p className="text-xs text-gray-500">公開中: {stats.activeJobs}件</p>
-                </div>
-                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <BarChart3 className="h-6 w-6 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+        {/* Stats Overview removed */}
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">総応募者数</p>
-                  <p className="text-2xl font-bold">{stats.totalApplications}</p>
-                  <div className="flex items-center space-x-1">
-                    <TrendingUp className={`h-3 w-3 ${getChangeColor(periodStats.applications.change)}`} />
-                    <p className={`text-xs ${getChangeColor(periodStats.applications.change)}`}>
-                      +{periodStats.applications.change}% (30日)
-                    </p>
-                  </div>
-                </div>
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                  <Users className="h-6 w-6 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">面談実施数</p>
-                  <p className="text-2xl font-bold">{stats.totalInterviews}</p>
-                  <div className="flex items-center space-x-1">
-                    <TrendingUp className={`h-3 w-3 ${getChangeColor(periodStats.interviews.change)}`} />
-                    <p className={`text-xs ${getChangeColor(periodStats.interviews.change)}`}>
-                      +{periodStats.interviews.change}% (30日)
-                    </p>
-                  </div>
-                </div>
-                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                  <Calendar className="h-6 w-6 text-purple-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">採用成功数</p>
-                  <p className="text-2xl font-bold">{stats.totalHires}</p>
-                  <div className="flex items-center space-x-1">
-                    <TrendingUp className={`h-3 w-3 ${getChangeColor(periodStats.hires.change)}`} />
-                    <p className={`text-xs ${getChangeColor(periodStats.hires.change)}`}>
-                      +{periodStats.hires.change}% (30日)
-                    </p>
-                  </div>
-                </div>
-                <div className="w-12 h-12 bg-orange-100 rounded-lg flex items-center justify-center">
-                  <Target className="h-6 w-6 text-orange-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Performance Metrics */}
-        <div className="grid grid-cols-3 gap-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">平均応募数</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600 mb-2">{stats.averageApplications}</div>
-              <p className="text-sm text-gray-600">求人あたりの平均応募者数</p>
-              <Progress value={65} className="mt-3 h-2" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">採用成功率</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600 mb-2">{stats.conversionRate}%</div>
-              <p className="text-sm text-gray-600">応募者から採用への転換率</p>
-              <Progress value={stats.conversionRate} className="mt-3 h-2" />
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">応答率</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600 mb-2">{stats.responseRate}%</div>
-              <p className="text-sm text-gray-600">メッセージへの応答率</p>
-              <Progress value={stats.responseRate} className="mt-3 h-2" />
-            </CardContent>
-          </Card>
-        </div>
 
         {/* Search and Filter */}
         <Card>
@@ -518,10 +404,6 @@ interface JobRow {
                 </Select>
               </div>
               <div className="flex items-center space-x-2">
-                <Button variant="outline" size="sm">
-                  <Filter className="h-4 w-4 mr-2" />
-                  詳細フィルター
-                </Button>
                 {selectedJobs.length > 0 && (
                   <Dialog open={showBulkActions} onOpenChange={setShowBulkActions}>
                     <DialogTrigger asChild>

@@ -30,17 +30,6 @@ import {
 
 const menuItems = [
   {
-    title: "ダッシュボード",
-    url: "/admin/dashboard",
-    icon: BarChart3,
-  },
-  {
-    title: "システム監視",
-    url: "/admin/monitoring",
-    icon: Activity,
-    badge: 2,
-  },
-  {
     title: "学生ユーザー管理",
     url: "/admin/users",
     icon: Users,
@@ -51,46 +40,9 @@ const menuItems = [
     icon: Building2,
     badge: 3,
   },
-  {
-    title: "コンテンツ管理",
-    url: "/admin/content",
-    icon: FileText,
-  },
-  {
-    title: "報告・通報",
-    url: "/admin/reports",
-    icon: Flag,
-    badge: 5,
-  },
-  {
-    title: "分析・レポート",
-    url: "/admin/analytics",
-    icon: TrendingUp,
-  },
 ]
 
-const systemItems = [
-  {
-    title: "セキュリティ",
-    url: "/admin/security",
-    icon: Shield,
-  },
-  {
-    title: "データベース",
-    url: "/admin/database",
-    icon: Database,
-  },
-  {
-    title: "通知管理",
-    url: "/admin/notifications",
-    icon: Bell,
-  },
-  {
-    title: "システム設定",
-    url: "/admin/settings",
-    icon: Settings,
-  },
-]
+const systemItems = []
 
 export function AdminSidebar() {
   return (

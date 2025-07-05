@@ -215,14 +215,6 @@ export default function ApplicantDetailPage() {
             >
               {applicant.status}
             </Badge>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4 mr-2" />
-              PDF出力
-            </Button>
-            <Button variant="outline" size="sm">
-              <Share className="h-4 w-4 mr-2" />
-              共有
-            </Button>
           </div>
         </div>
       </header>
@@ -339,11 +331,9 @@ export default function ApplicantDetailPage() {
         {/* Main Content */}
         <div className="flex-1 p-6">
           <Tabs defaultValue="application" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-5">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="application">応募情報</TabsTrigger>
               <TabsTrigger value="experience">実務経験</TabsTrigger>
-              <TabsTrigger value="skills">スキル</TabsTrigger>
-              <TabsTrigger value="personality">診断結果</TabsTrigger>
               <TabsTrigger value="learning">学習記録</TabsTrigger>
             </TabsList>
 
@@ -428,174 +418,6 @@ export default function ApplicantDetailPage() {
               </Card>
             </TabsContent>
 
-            {/* スキル */}
-            <TabsContent value="skills" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>スキル一覧</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    {applicant.skills?.map((skill: any, index: number) => (
-                      <div key={index} className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm font-medium">{skill.name}</span>
-                            {skill.verified && (
-                              <Badge className="bg-green-100 text-green-800 text-xs px-1.5 py-0.5">実証済み</Badge>
-                            )}
-                          </div>
-                          <div className="flex space-x-1">
-                            {[1, 2, 3, 4, 5].map((star) => (
-                              <Star
-                                key={star}
-                                className={`h-3 w-3 ${star <= skill.level ? "text-yellow-500 fill-current" : "text-gray-300"}`}
-                              />
-                            ))}
-                          </div>
-                        </div>
-                        <Progress value={(skill.level / 5) * 100} className="h-1.5" />
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {applicant.skillGrowthHistory && applicant.skillGrowthHistory.length > 0 ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>スキル成長履歴</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-4">
-                      {applicant.skillGrowthHistory.map((growth: any, idx: number) => (
-                        <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                          <div>
-                            <p className="text-sm font-semibold">{growth.skillName}</p>
-                            <p className="text-xs text-gray-600">
-                              レベル {growth.fromLevel} → {growth.toLevel} に向上
-                            </p>
-                          </div>
-                          <div className="text-xs text-gray-500">{growth.date}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle>スキル成長履歴</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600">データがありません</p>
-                  </CardContent>
-                </Card>
-              )}
-            </TabsContent>
-
-            {/* 診断結果 */}
-            <TabsContent value="personality" className="space-y-6">
-              {applicant.personalityTest ? (
-                <>
-                  <Card>
-                    <CardHeader>
-                      <div className="flex items-center justify-between">
-                        <CardTitle>志向性診断結果</CardTitle>
-                        <div className="text-right">
-                          <div className="text-2xl font-bold text-blue-600">{applicant.personalityTest.overallScore}</div>
-                          <div className="text-xs text-gray-600">総合スコア</div>
-                        </div>
-                      </div>
-                      <p className="text-sm text-gray-600">実施日: {applicant.personalityTest.completedDate}</p>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="space-y-4">
-                        {applicant.personalityTest.categories?.map((category: any, index: number) => (
-                          <div key={index} className="space-y-2">
-                            <div className="flex items-center justify-between">
-                              <h4 className="font-semibold text-sm">{category.name}</h4>
-                              <div
-                                className={`px-2 py-1 rounded-full text-xs font-semibold ${getScoreColor(category.score)}`}
-                              >
-                                {category.score}点
-                              </div>
-                            </div>
-                            <Progress value={category.score} className="h-2" />
-                            <p className="text-xs text-gray-600">{category.description}</p>
-                            <div className="flex flex-wrap gap-1">
-                              {category.strengths?.map((strength: any) => (
-                                <Badge key={strength} variant="outline" className="text-xs">
-                                  {strength}
-                                </Badge>
-                              ))}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <div className="grid grid-cols-2 gap-6">
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">推奨職種</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          {applicant.personalityTest.recommendedRoles?.map((role: any) => (
-                            <div key={role} className="flex items-center space-x-2">
-                              <Target className="h-4 w-4 text-green-600" />
-                              <span className="text-sm">{role}</span>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="text-base">働き方の特徴</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <p className="text-sm text-gray-700">{applicant.personalityTest.workStyle}</p>
-                      </CardContent>
-                    </Card>
-                  </div>
-
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">診断結果の詳細分析</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="text-center">
-                          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                            <BarChart3 className="h-8 w-8 text-blue-600" />
-                          </div>
-                          <p className="text-xs font-semibold">分析思考型</p>
-                          <p className="text-xs text-gray-600">データ重視</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                            <Users className="h-8 w-8 text-green-600" />
-                          </div>
-                          <p className="text-xs font-semibold">協調型</p>
-                          <p className="text-xs text-gray-600">チームワーク</p>
-                        </div>
-                        <div className="text-center">
-                          <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-2">
-                            <TrendingUp className="h-8 w-8 text-purple-600" />
-                          </div>
-                          <p className="text-xs font-semibold">成長志向</p>
-                          <p className="text-xs text-gray-600">学習意欲</p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </>
-              ) : null}
-            </TabsContent>
 
             {/* 学習記録 */}
             <TabsContent value="learning" className="space-y-6">
@@ -624,45 +446,6 @@ export default function ApplicantDetailPage() {
                   </div>
                 </CardContent>
               </Card>
-
-              {applicant.learningStats ? (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">学習統計</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-blue-600">
-                          {applicant.learningStats.totalNotes}
-                        </div>
-                        <div className="text-xs text-gray-600">総学習メモ数</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-green-600">
-                          {applicant.learningStats.skillCount}
-                        </div>
-                        <div className="text-xs text-gray-600">習得スキル数</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-2xl font-bold text-purple-600">
-                          {applicant.learningStats.averageGrowth}
-                        </div>
-                        <div className="text-xs text-gray-600">平均成長率</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ) : (
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-base">学習統計</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm text-gray-600">データがありません</p>
-                  </CardContent>
-                </Card>
-              )}
             </TabsContent>
           </Tabs>
         </div>
