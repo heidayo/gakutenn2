@@ -52,13 +52,24 @@ export default function StudentLoginPage() {
   const handleSocialLogin = async (provider: Provider | "line") => {
     setSocialLoading(provider)
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
-        // provider may include "line", so cast to any
-        provider: provider as any,
-        options: {
-          redirectTo: `${location.origin}/student/mypage`
-        }
-      })
+      let authResult
+      if (provider === "line") {
+        // Use custom callback endpoint for LINE mapped to Keycloak
+        authResult = await supabase.auth.signInWithOAuth({
+          provider: "line" as any,
+          options: {
+            redirectTo: `${window.location.origin}/auth/line/callback`
+          }
+        })
+      } else {
+        authResult = await supabase.auth.signInWithOAuth({
+          provider: provider as any,
+          options: {
+            redirectTo: `${window.location.origin}/student/mypage`
+          }
+        })
+      }
+      const { error } = authResult
       if (error) {
         throw error
       }

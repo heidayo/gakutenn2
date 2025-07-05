@@ -802,14 +802,14 @@ export type Database = {
           id: string
           last_name: string | null
           location: string | null
-          major: string
+          major: string | null
           name: string
           phone: string | null
           status: string | null
           university: string
           updated_at: string | null
           user_id: string | null
-          year: number
+          year: number | null
         }
         Insert: {
           avatar_url?: string | null
@@ -821,14 +821,14 @@ export type Database = {
           id?: string
           last_name?: string | null
           location?: string | null
-          major: string
+          major?: string | null
           name: string
           phone?: string | null
           status?: string | null
-          university: string
+          university?: string
           updated_at?: string | null
           user_id?: string | null
-          year: number
+          year?: number | null
         }
         Update: {
           avatar_url?: string | null
@@ -840,14 +840,14 @@ export type Database = {
           id?: string
           last_name?: string | null
           location?: string | null
-          major?: string
+          major?: string | null
           name?: string
           phone?: string | null
           status?: string | null
           university?: string
           updated_at?: string | null
           user_id?: string | null
-          year?: number
+          year?: number | null
         }
         Relationships: []
       }
