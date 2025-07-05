@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { Progress } from "@/components/ui/progress"
 import {
   ArrowLeft,
   Star,
@@ -129,24 +128,6 @@ export default function FeedbackListPage() {
           </Card>
           <Card className="p-4">
             <div className="flex items-center space-x-2">
-              <Star className="h-5 w-5 text-yellow-600" />
-              <div>
-                <div className="text-lg font-bold text-yellow-600">{feedbackStats.averageRating}</div>
-                <div className="text-xs text-gray-600">平均評価</div>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center space-x-2">
-              <TrendingUp className="h-5 w-5 text-green-600" />
-              <div>
-                <div className="text-lg font-bold text-green-600">{feedbackStats.improvementRate}%</div>
-                <div className="text-xs text-gray-600">成長実感度</div>
-              </div>
-            </div>
-          </Card>
-          <Card className="p-4">
-            <div className="flex items-center space-x-2">
               <BookOpen className="h-5 w-5 text-purple-600" />
               <div>
                 <div className="text-lg font-bold text-purple-600">{feedbackStats.learningNotes}</div>
@@ -155,29 +136,6 @@ export default function FeedbackListPage() {
             </div>
           </Card>
         </div>
-
-        {/* Progress Card */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">今月の成長目標</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>学びメモ作成</span>
-                <span className="text-gray-600">8/10</span>
-              </div>
-              <Progress value={80} className="h-2" />
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>平均評価向上</span>
-                <span className="text-gray-600">4.3/4.5</span>
-              </div>
-              <Progress value={96} className="h-2" />
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Category Filter */}
         <div className="flex space-x-2 overflow-x-auto scrollbar-hide">

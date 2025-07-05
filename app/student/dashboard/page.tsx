@@ -199,29 +199,6 @@ export default function StudentDashboardPage() {
           </Card>
         </div>
 
-        {/* Monthly Goals */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex items-center">
-              <Target className="h-4 w-4 mr-2" />
-              今月の目標
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {goals.map((goal, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span>{goal.title}</span>
-                  <span className="text-gray-600">
-                    {goal.current}/{goal.target}
-                  </span>
-                </div>
-                <Progress value={goal.progress} className="h-2" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
         {/* Upcoming Interviews */}
         <Card>
           <CardHeader>

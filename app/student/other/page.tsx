@@ -37,20 +37,6 @@ const menuSections = [
         url: "/student/account/edit",
         badge: null,
       },
-      {
-        title: "通知設定",
-        description: "メッセージ・求人通知の設定",
-        icon: Bell,
-        url: "/student/notifications",
-        badge: null,
-      },
-      {
-        title: "セキュリティ",
-        description: "パスワード・2段階認証",
-        icon: Shield,
-        url: "/student/security",
-        badge: null,
-      },
     ],
   },
   {
@@ -76,32 +62,6 @@ const menuSections = [
         icon: MessageCircle,
         url: "/student/feedback",
         badge: "3",
-      },
-    ],
-  },
-  {
-    title: "サポート",
-    items: [
-      {
-        title: "ヘルプセンター",
-        description: "よくある質問・使い方ガイド",
-        icon: HelpCircle,
-        url: "/help",
-        badge: null,
-      },
-      {
-        title: "データダウンロード",
-        description: "個人データのダウンロード",
-        icon: Download,
-        url: "/student/data-export",
-        badge: null,
-      },
-      {
-        title: "アプリを評価",
-        description: "App Store・Google Playで評価",
-        icon: Star,
-        url: "/rate-app",
-        badge: null,
       },
     ],
   },

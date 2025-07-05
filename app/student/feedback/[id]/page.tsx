@@ -5,7 +5,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Label } from "@/components/ui/label"
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import {
   ArrowLeft,
   Star,
@@ -13,7 +12,6 @@ import {
   Calendar,
   Clock,
   BookOpen,
-  FileText,
   Save,
   Share,
   Copy,
@@ -29,7 +27,6 @@ import { useParams } from 'next/navigation'
 
 export default function FeedbackDetailPage() {
   const [learningNote, setLearningNote] = useState("")
-  const [showResumeDialog, setShowResumeDialog] = useState(false)
   const [isSaved, setIsSaved] = useState(false)
   const [feedback, setFeedback] = useState<any>(null)
   const [existingLearningNote, setExistingLearningNote] = useState<string | null>(null)
@@ -90,12 +87,6 @@ export default function FeedbackDetailPage() {
       }
     }
     saveNote()
-  }
-
-  const handleAddToResume = () => {
-    // 履歴書転記処理
-    console.log("Adding to resume")
-    setShowResumeDialog(false)
   }
 
   const renderStars = (rating: number) => {
@@ -289,60 +280,10 @@ export default function FeedbackDetailPage() {
                   </>
                 )}
               </Button>
-              <Dialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" className="flex-1">
-                    <FileText className="h-4 w-4 mr-2" />
-                    履歴書に転記
-                  </Button>
-                </DialogTrigger>
-              </Dialog>
             </div>
           </CardContent>
         </Card>
       </div>
-
-      {/* Resume Transfer Dialog */}
-      <Dialog open={showResumeDialog} onOpenChange={setShowResumeDialog}>
-        <DialogContent className="max-w-sm mx-auto">
-          <DialogHeader>
-            <DialogTitle>履歴書への転記</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-sm text-gray-600">
-              このフィードバックと学びメモを履歴書の「実務経験」セクションに追加しますか？
-            </p>
-            <div className="bg-gray-50 p-3 rounded-lg">
-              <h4 className="font-semibold text-sm mb-2">転記内容プレビュー</h4>
-              <div className="text-xs space-y-1">
-                <p>
-                  <strong>職種:</strong> {feedback.role}
-                </p>
-                <p>
-                  <strong>企業:</strong> {feedback.company.name}
-                </p>
-                <p>
-                  <strong>期間:</strong> {feedback.duration}
-                </p>
-                <p>
-                  <strong>評価:</strong> ★{overall_rating}
-                </p>
-                <p>
-                  <strong>学び:</strong> {existingLearningNote || learningNote}
-                </p>
-              </div>
-            </div>
-            <div className="flex space-x-2">
-              <Button variant="outline" onClick={() => setShowResumeDialog(false)} className="flex-1">
-                キャンセル
-              </Button>
-              <Button onClick={handleAddToResume} className="flex-1 bg-blue-600 hover:bg-blue-700">
-                履歴書に追加
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

@@ -430,30 +430,18 @@ export default function StudentHomePage() {
       {/* Feature Icons */}
       <div className="px-4 py-4">
         <div className="bg-white rounded-2xl p-6">
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 gap-4">
             <Link href="/student/search?type=part-time" className="text-center">
               <div className="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center mb-2 mx-auto hover:bg-orange-700 transition-colors">
                 <Users className="h-6 w-6 text-white" />
               </div>
-              <div className="text-xs text-gray-700">アルバイト</div>
-            </Link>
-            <Link href="/student/search?type=internship" className="text-center">
-              <div className="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center mb-2 mx-auto hover:bg-orange-700 transition-colors">
-                <GraduationCap className="h-6 w-6 text-white" />
-              </div>
-              <div className="text-xs text-gray-700">インターン</div>
+              <div className="text-xs text-gray-700">求人情報</div>
             </Link>
             <Link href="/student/feedback" className="text-center">
               <div className="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center mb-2 mx-auto hover:bg-orange-700 transition-colors">
                 <MessageSquare className="h-6 w-6 text-white" />
               </div>
               <div className="text-xs text-gray-700">フィードバック</div>
-            </Link>
-            <Link href="/student/articles" className="text-center">
-              <div className="w-12 h-12 bg-orange-600 rounded-full flex items-center justify-center mb-2 mx-auto hover:bg-orange-700 transition-colors">
-                <FileText className="h-6 w-6 text-white" />
-              </div>
-              <div className="text-xs text-gray-700">ニュース・コラム</div>
             </Link>
           </div>
         </div>

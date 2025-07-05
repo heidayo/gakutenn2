@@ -331,14 +331,6 @@ const handleBookmark = async () => {
             <Button className="w-full bg-blue-600 hover:bg-blue-700 h-12 text-base">この求人に応募する</Button>
           </Link>
           <div className="grid grid-cols-2 gap-3">
-            <Button variant="outline" className="flex items-center justify-center">
-              <MessageSquare className="h-4 w-4 mr-2" />
-              質問する
-            </Button>
-            <Button variant="outline" className="flex items-center justify-center">
-              <Building2 className="h-4 w-4 mr-2" />
-              企業ページ
-            </Button>
           </div>
         </div>
       </div>
