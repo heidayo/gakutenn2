@@ -180,11 +180,11 @@ export default function StudentRegisterPage() {
     }
   }
 
-  const handleSocialLogin = async (provider: Provider | "LINE") => {
+  const handleSocialLogin = async (provider: Provider) => {
     setIsLoading(true)
     setErrors({})  // clear previous errors
     try {
-      const { error } = await supabase.auth.signInWithOAuth({
+      const { data, error } = await supabase.auth.signInWithOAuth({
         provider: provider as any,
         options: {
           redirectTo: `${location.origin}/auth/student/register/complete`
@@ -192,6 +192,9 @@ export default function StudentRegisterPage() {
       })
       if (error) {
         throw error
+      }
+      if (data?.url) {
+        window.location.href = data.url
       }
     } catch (err: any) {
       setErrors({ submit: err.message || `${provider}ログインに失敗しました。` })
@@ -244,15 +247,15 @@ export default function StudentRegisterPage() {
               <form onSubmit={(e) => { e.preventDefault(); handleNext(); }}>
                 {/* ソーシャルログインボタン */}
                 <div className="space-y-3">
-                  <Button
-                    variant="outline"
-                    className="w-full"
-                    onClick={() => handleSocialLogin("LINE")}
-                    disabled={isLoading}
-                  >
-                    <Smartphone className="h-4 w-4 mr-2 text-green-500" />
-                    LINEで登録
-                  </Button>
+                <Button
+                  variant="outline"
+                  className="w-full flex items-center justify-center"
+                  onClick={() => (window.location.href = '/api/auth/line/login')}
+                  disabled={isLoading}
+                >
+                  <Smartphone className="h-4 w-4 mr-2" />
+                  LINEで登録
+                </Button>
                   <Button
                     variant="outline"
                     className="w-full"
